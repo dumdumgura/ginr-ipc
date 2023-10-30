@@ -65,7 +65,7 @@ class Trainer(TrainerTemplate):
 
         if self.distenv.master and verbose:
             mode = "valid" if valid else "train"
-            mode = "%s_ema" % mode if ema else mode
+            mode = "%sudo apt install python3.7s_ema" % mode if ema else mode
             logger.info(f"""{mode:10s}, """ + line)
             self.reconstruct(xs, epoch=0, mode=mode)
 
@@ -92,6 +92,7 @@ class Trainer(TrainerTemplate):
             xs = xs.to(self.device, non_blocking=True)
 
             coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
+            #prediction
             outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True)
 
             targets = xs.detach()

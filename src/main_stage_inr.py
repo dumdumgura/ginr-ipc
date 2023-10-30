@@ -17,7 +17,7 @@ from utils.setup import setup
 
 def default_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--model-config", type=str, default="./configs/image/imagenette178_low_rank_modulated_transinr.yaml")
+    parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/imagenette178_meta_low_rank.yaml")
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp")
     parser.add_argument("-l", "--load-path", type=str, default="")
     parser.add_argument("-p", "--postfix", type=str, default="")
@@ -29,9 +29,9 @@ def default_parser():
 def add_dist_arguments(parser):
     parser.add_argument("--world_size", default=-1, type=int, help="number of nodes for distributed training")
     parser.add_argument("--local_rank", default=-1, type=int, help="local rank for distributed training")
-    parser.add_argument("--node_rank", default=-1, type=int, help="node rank for distributed training")
-    parser.add_argument("--nnodes", default=-1, type=int)
-    parser.add_argument("--nproc_per_node", default=-1, type=int)
+    parser.add_argument("--node_rank", default=0, type=int, help="node rank for distributed training")
+    parser.add_argument("--nnodes", default=1, type=int)
+    parser.add_argument("--nproc_per_node", default=1, type=int)
     parser.add_argument("--dist-backend", default="nccl", type=str, help="distributed backend")
     parser.add_argument("--timeout", type=int, default=86400, help="time limit (s) to wait for other nodes in DDP")
     return parser

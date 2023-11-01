@@ -4,11 +4,14 @@ import einops
 import numpy as np
 import torch
 import torch.nn as nn
+import os
 
+from functools import *
 from .configs import MetaLowRankModulatedINRConfig
 from .modules.coord_sampler import CoordSampler
 from .modules.hyponet import HypoNet
 from .transinr import TransINR
+from .modules.sdf_meshing import create_meshes
 
 Tensor = torch.Tensor
 TensorDict = typing.Dict[str, Tensor]
@@ -152,6 +155,21 @@ class MetaLowRankModulatedINR(TransINR):
             outputs = outputs.permute(0, -1, *permute_idx_range)
         return outputs
 
+    def decode_with_modulation_factors(self, xs, modulation_factors_dict, coord=None):
+        r"""Inference function on Hyponet, modulated via given modulation factors."""
+        #coord = self.sample_coord_input(xs) if coord is None else coord
+
+        # convert modulation factors into modulation params
+        modulation_params_dict = self.factors.compute_modulation_params_dict(modulation_factors_dict)
+
+        meshes = []
+        # predict all pixels of coord after applying the modulation_parms into hyponet
+
+        meshes=create_meshes(
+            self.hyponet,modulation_params_dict,level=0.0, N=32
+        )
+        return meshes
+
     def inner_step(
         self,
         xs: Tensor,
@@ -168,7 +186,7 @@ class MetaLowRankModulatedINR(TransINR):
 
             # compute the loss
             # reduction should be "sum" here, since we are computing per-sample gradient
-            metrics = self.compute_loss(recons, xs, reduction="sum")
+            metrics = self.compute_loss(recons, xs, reduction="ce")
 
             # compute gradient w.r.t. latents
             factor_names = list(modulation_factors_dict.keys())
@@ -182,6 +200,7 @@ class MetaLowRankModulatedINR(TransINR):
                     lr_scale = factor.norm(dim=[1, 2], keepdim=True).pow(2.0)
                 else:
                     lr_scale = 1.0
+                print(factor.norm())
                 new_factor = factor - inner_lr * lr_scale * grad
                 new_modulation_factors_dict[name] = new_factor
 
@@ -237,7 +256,7 @@ class MetaLowRankModulatedINR(TransINR):
             collated[key] = tensors
         return collated
 
-    def forward(self, xs, coord=None, n_inner_step=None, inner_lr=None, is_training=None):
+    def forward(self, xs, coord=None, n_inner_step=None, inner_lr=None, is_training=None,vis=False):
         r"""Infers the signal values at the given coordinates, after an inner loop adapted for `xs`.
 
         Arguments:
@@ -247,6 +266,7 @@ class MetaLowRankModulatedINR(TransINR):
             inner_lr (float, optional): learning rate used in inner steps. (Default: `self.inner_lr`)
             is_training (bool, optional): indicates whether it is in training context. (Default: `self.training`)
         """
+
         coord = self.sample_coord_input(xs) if coord is None else coord
         n_inner_step = self.n_inner_step if n_inner_step is None else n_inner_step
         inner_lr = self.inner_lr if inner_lr is None else inner_lr
@@ -256,5 +276,10 @@ class MetaLowRankModulatedINR(TransINR):
             xs, coord = coord, n_inner_step=n_inner_step, inner_lr=inner_lr, is_training=is_training
         )
         outputs = self.predict_with_modulation_factors(xs, modulation_factors_dict, coord)
+
+        if vis:
+            visuals = self.decode_with_modulation_factors(xs, modulation_factors_dict, coord)
+            return visuals
+
         collated_history = self._collate_inner_loop_history(inner_loop_history)
         return outputs, modulation_factors_dict, collated_history

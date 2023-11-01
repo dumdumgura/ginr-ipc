@@ -12,10 +12,10 @@ arch: # needs to add encoder, modulation type
 
   rank: [256] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
   modulated_layer_idxs: [1]
-  use_factorization: true
+  use_factorization: false
 
-  n_inner_step: 3
-  inner_lr: 0.003
+  n_inner_step: 1
+  inner_lr: 0.001
 
   coord_sampler:
     data_type: image
@@ -55,8 +55,8 @@ loss:
 
 optimizer:
   type: adam
-  init_lr: 0.0001
-  weight_decay: 0.0
+  init_lr: 0.001
+  weight_decay: 0.001
   betas: [0.9, 0.999] #[0.9, 0.95]
   warmup:
     epoch: 0
@@ -69,10 +69,10 @@ optimizer:
 
 experiment:
   amp: True
-  batch_size: 2
-  total_batch_size: 2
+  batch_size: 1
+  total_batch_size: 1
   epochs: 10000
-  save_ckpt_freq: 300
-  test_freq: 2
+  save_ckpt_freq: 20
+  test_freq: 10
   test_imlog_freq: 200
 

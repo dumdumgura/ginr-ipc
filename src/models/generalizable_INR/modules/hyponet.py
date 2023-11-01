@@ -214,6 +214,7 @@ class HypoNet(nn.Module):
                     modulated_param = base_param * modulation_param
 
             hidden = torch.bmm(hidden, modulated_param)
+            print(modulated_param.norm())
 
             if idx < (self.config.n_layer - 1):
                 hidden = self.activation(hidden)

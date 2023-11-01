@@ -13,6 +13,7 @@ imageio
 torchaudio==0.13.0
 ftfy
 regex
-open3d
+plyfile
+scikit-image
 datadings
 trimesh

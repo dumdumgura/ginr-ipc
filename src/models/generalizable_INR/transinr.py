@@ -110,7 +110,7 @@ class TransINR(nn.Module):
         return self.latent_mapping(xs_embed)
 
     def compute_loss(self, preds, targets, reduction="mean"):
-        assert reduction in ["mean", "sum", "none"]
+        assert reduction in ["mean", "sum", "ce","none"]
         batch_size = preds.shape[0]
         sample_mses = torch.reshape((preds - targets) ** 2, (batch_size, -1)).mean(dim=-1)
 
@@ -120,9 +120,23 @@ class TransINR(nn.Module):
         elif reduction == "sum":
             total_loss = sample_mses.sum()
             psnr = (-10 * torch.log10(sample_mses)).sum()
+        elif reduction == "ce":
+            threshold = 1e-12
+            logits =1.0 / (1 + torch.exp(-preds))
+            logits = torch.clamp(logits, min=threshold)
+
+            total_loss = -targets * torch.log(logits)   -  (1-targets)* torch.log(1-logits)
+
+            total_loss = torch.clamp(total_loss, min=threshold)
+
+            total_loss = torch.reshape(total_loss, (batch_size, -1)).mean(dim=-1).sum()
+            psnr = -10 * torch.log10(total_loss)
+            pass
         else:
             total_loss = sample_mses
             psnr = -10 * torch.log10(sample_mses)
+
+
 
         return {"loss_total": total_loss, "mse": total_loss, "psnr": psnr}
 

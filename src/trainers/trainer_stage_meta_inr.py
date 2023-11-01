@@ -1,8 +1,10 @@
 import logging
 
+import numpy as np
 import torch
 import torchvision
 from tqdm import tqdm
+import plyfile
 
 from utils.accumulator import AccmStageINR
 from .trainer import TrainerTemplate
@@ -114,7 +116,7 @@ class Trainer(TrainerTemplate):
 
             targets = xs.detach()
             #loss = model.module.compute_loss(outputs, targets)
-            loss = model.compute_loss(outputs, targets)
+            loss = model.compute_loss(outputs, targets,'ce')
             loss["loss_total"].backward()
             if self.config.optimizer.max_gn is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), self.config.optimizer.max_gn)
@@ -151,8 +153,44 @@ class Trainer(TrainerTemplate):
                 model = self.model
                 model.eval()
                 xs = summary["xs"]
-                coord_inputs = xs['coords'].to(self.device)
+                coords = xs['coords'].to(self.device)
                 xs = xs['occ'].to(self.device)
+
+                meshes=model(xs,coords,is_training=False,vis=True)
+
+                # try writing to the ply file
+                verts = meshes[0]['vertices']
+                faces = meshes[0]['faces']
+                voxel_grid_origin = [-0.5] * 3
+                mesh_points = np.zeros_like(verts)
+                mesh_points[:, 0] = voxel_grid_origin[0] + verts[:, 0]
+                mesh_points[:, 1] = voxel_grid_origin[1] + verts[:, 1]
+                mesh_points[:, 2] = voxel_grid_origin[2] + verts[:, 2]
+
+                num_verts = verts.shape[0]
+                num_faces = faces.shape[0]
+
+                verts_tuple = np.zeros((num_verts,), dtype=[("x", "f4"), ("y", "f4"), ("z", "f4")])
+
+                for i in range(0, num_verts):
+                    verts_tuple[i] = tuple(mesh_points[i, :])
+
+                faces_building = []
+                for i in range(0, num_faces):
+                    faces_building.append(((faces[i, :].tolist(),)))
+                faces_tuple = np.array(faces_building, dtype=[("vertex_indices", "i4", (3,))])
+
+                el_verts = plyfile.PlyElement.describe(verts_tuple, "vertex")
+                el_faces = plyfile.PlyElement.describe(faces_tuple, "face")
+
+                ply_data = plyfile.PlyData([el_verts, el_faces])
+                #logging.debug("saving mesh to %s" % (ply_filename_out))
+                ply_data.write("poly.ply")
+
+
+
+
+
                 vertices_tensor = torch.as_tensor([
                     [1, 1, 1],
                     [-1, -1, 1],
@@ -169,14 +207,25 @@ class Trainer(TrainerTemplate):
                     [0, 2, 3],
                     [0, 3, 1],
                     [0, 1, 2],
-                    [1, 3, 2],
                 ], dtype=torch.int).unsqueeze(0)
 
-                self.writer.add_mesh(mode=mode,tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor, faces=faces_tensor)
+                #self.writer.add_mesh(mode=mode, tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,
+                #                     faces=faces_tensor)
 
-                #xs_real = xs[:4]
-                # coord_inputs = model.module.sample_coord_input(xs_real, upsample_ratio=upsample_ratio, device=xs.device)
-                #xs_recon, _, collated_history = model(xs_real, coord_inputs, is_training=False)
+
+
+                for i in range(len(meshes)):
+
+                    vertices_tensor = torch.as_tensor(meshes[i]['vertices'].copy(), dtype=torch.int).unsqueeze(0)
+                    faces_tensor=torch.as_tensor(meshes[i]['faces'].copy(), dtype=torch.int).unsqueeze(0)
+                    color = np.array([[255, 154, 234]])
+                    color = np.repeat(color, meshes[i]['vertices'].shape[0], axis=0)
+                    colors_tensor = torch.as_tensor(color, dtype=torch.int).unsqueeze(0)
+                    self.writer.add_mesh(mode=mode,tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,faces=faces_tensor)
+
+
+
+
 
 
             else:

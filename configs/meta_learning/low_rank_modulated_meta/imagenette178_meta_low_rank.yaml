@@ -13,7 +13,7 @@ arch: # needs to add encoder, modulation type
   modulated_layer_idxs: [1]
   use_factorization: true
 
-  n_inner_step: 2
+  n_inner_step: 3
   inner_lr: 0.003
 
   coord_sampler:
@@ -67,10 +67,10 @@ optimizer:
 
 experiment:
   amp: True
-  batch_size: 4
-  total_batch_size: 16
-  epochs: 800
-  save_ckpt_freq: 50
-  test_freq: 10
-  test_imlog_freq: 50
+  batch_size: 6
+  total_batch_size: 12
+  epochs: 10000
+  save_ckpt_freq: 1000
+  test_freq: 100
+  test_imlog_freq: 100
 

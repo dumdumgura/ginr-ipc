@@ -7,7 +7,7 @@
   </component>
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$" />
-    <orderEntry type="jdk" jdkName="g_inr" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="g_inr (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="g_inr interpreter library" level="application" />
   </component>

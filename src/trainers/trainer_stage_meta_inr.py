@@ -42,11 +42,15 @@ class Trainer(TrainerTemplate):
             model.zero_grad()
 
             xs = xs.to(self.device)  # [B, C, *]
-            coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
+
+            #coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
+            coord_inputs = model.sample_coord_input(xs, device=xs.device)
 
             outputs, _, collated_history = model(xs, coord_inputs, is_training=False)
             targets = xs.detach()
-            loss = model.module.compute_loss(outputs, targets, reduction="sum")
+
+            #loss = model.module.compute_loss(outputs, targets, reduction="sum")
+            loss = model.compute_loss(outputs, targets, reduction="sum")
 
             metrics = dict(
                 loss_total=loss["loss_total"],
@@ -80,23 +84,26 @@ class Trainer(TrainerTemplate):
         total_step = len(self.loader_trn) * epoch
 
         accm = self.get_accm()
-
+        #self.distenv.master = 0
         if self.distenv.master:
             pbar = tqdm(enumerate(self.loader_trn), total=len(self.loader_trn))
+            #pbar = enumerate(self.loader_trn)
         else:
             pbar = enumerate(self.loader_trn)
 
         model.train()
         for it, xs in pbar:
             model.zero_grad(set_to_none=True)
-            xs = xs.to(self.device, non_blocking=True)
-
-            coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
+            #xs = xs.to(self.device, non_blocking=True)
+            xs = xs.to(self.device)
+            #coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
+            coord_inputs = model.sample_coord_input(xs, device=xs.device)
             #prediction
             outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True)
 
             targets = xs.detach()
-            loss = model.module.compute_loss(outputs, targets)
+            #loss = model.module.compute_loss(outputs, targets)
+            loss = model.compute_loss(outputs, targets)
             loss["loss_total"].backward()
             if self.config.optimizer.max_gn is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), self.config.optimizer.max_gn)
@@ -128,7 +135,7 @@ class Trainer(TrainerTemplate):
 
     def logging(self, summary, scheduler=None, epoch=0, mode="train"):
         if epoch % 10 == 1 or epoch % self.config.experiment.test_imlog_freq == 0:
-            self.reconstruct(summary["xs"], upsample_ratio=1, epoch=epoch, mode=mode)
+            #self.reconloggingstruct(summary["xs"], upsample_ratio=1, epoch=epoch, mode=mode)
             self.reconstruct(summary["xs"], upsample_ratio=3, epoch=epoch, mode=mode)
 
         self.writer.add_scalar("loss/loss_total", summary["loss_total"], mode, epoch)
@@ -173,7 +180,8 @@ class Trainer(TrainerTemplate):
         assert upsample_ratio > 0
 
         xs_real = xs[:4]
-        coord_inputs = model.module.sample_coord_input(xs_real, upsample_ratio=upsample_ratio, device=xs.device)
+        #coord_inputs = model.module.sample_coord_input(xs_real, upsample_ratio=upsample_ratio, device=xs.device)
+        coord_inputs = model.sample_coord_input(xs_real, upsample_ratio=upsample_ratio, device=xs.device)
 
         xs_recon, _, collated_history = model(xs_real, coord_inputs, is_training=False)
         xs_real, xs_recon = get_recon_imgs(xs_real, xs_recon, upsample_ratio)

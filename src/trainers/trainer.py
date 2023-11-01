@@ -46,32 +46,33 @@ class TrainerTemplate:
         self.dataset_trn = dataset_trn
         self.dataset_val = dataset_val
 
-        self.sampler_trn = torch.utils.data.distributed.DistributedSampler(
-            self.dataset_trn,
-            num_replicas=self.distenv.world_size,
-            rank=self.distenv.world_rank,
-            shuffle=True,
-            seed=self.config.seed,
-        )
+        #self.sampler_trn = torch.utils.data.distributed.DistributedSampler(
+        #    self.dataset_trn,
+        #    num_replicas=self.distenv.world_size,
+        #    rank=self.distenv.world_rank,
+        #    shuffle=True,
+        #    seed=self.config.seed,
+        #)
         self.loader_trn = DataLoader(
             self.dataset_trn,
-            sampler=self.sampler_trn,
+            #sampler=self.sampler_trn,
             shuffle=False,
             pin_memory=True,
             batch_size=config.experiment.batch_size,
-            num_workers=num_workers,
+            #num_workers=num_workers,
         )
 
-        self.sampler_val = torch.utils.data.distributed.DistributedSampler(
-            self.dataset_val, num_replicas=self.distenv.world_size, rank=self.distenv.world_rank, shuffle=False
-        )
+        #self.sampler_val = torch.utils.data.distributed.DistributedSampler(
+        #    self.dataset_val, num_replicas=self.distenv.world_size, rank=self.distenv.world_rank, shuffle=False
+        #)
+
         self.loader_val = DataLoader(
             self.dataset_val,
-            sampler=self.sampler_val,
+            #sampler=self.sampler_val,
             shuffle=False,
             pin_memory=True,
             batch_size=config.experiment.batch_size,
-            num_workers=num_workers,
+            #num_workers=num_workers,
         )
 
         self._scaler = None
@@ -92,7 +93,7 @@ class TrainerTemplate:
         scaler = self.scaler
 
         for i in range(epoch_st, self.config.experiment.epochs):
-            self.sampler_trn.set_epoch(i)
+            #self.sampler_trn.set_epoch(i)
             torch.cuda.empty_cache()
             summary_trn = self.train(optimizer, scheduler, scaler, epoch=i)
             if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
@@ -117,7 +118,8 @@ class TrainerTemplate:
         logger.info("epoch: %d, saving %s", epoch, ckpt_path)
         ckpt = {
             "epoch": epoch,
-            "state_dict": self.model.module.state_dict(),
+            #"state_dict": self.model.module.state_dict(),
+            "state_dict": self.model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
         }

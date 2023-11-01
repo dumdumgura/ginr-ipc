@@ -91,7 +91,7 @@ class TransINR(nn.Module):
         num_vectors_per_group = self.weight_groups.num_vectors_per_group_dict
 
         for name in self.hyponet.params_dict.keys():
-            if name not in self.weight_groups.group_idx_dict:
+            if name not in self.wpermuteeight_groups.group_idx_dict:
                 continue
             start_idx, end_idx = self.weight_groups.group_idx_dict[name]
             _group_output = group_output[:, start_idx:end_idx]

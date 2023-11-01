@@ -19,21 +19,21 @@ def default_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/imagenette178_meta_low_rank.yaml")
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp")
-    parser.add_argument("-l", "--load-path", type=str, default="")
+    parser.add_argument("-l", "--load-path", type=str, default="/home/umaru/praktikum/changed_version/ginr-ipc/results.tmp/imagenette178_meta_low_rank/31102023_121140/epoch6000_model.pt")
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--eval", action="store_true")
-    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--resume", action="store_true",default=True)
     return parser
 
 def add_dist_arguments(parser):
-    parser.add_argument("--world_size", default=-1, type=int, help="number of nodes for distributed training")
-    parser.add_argument("--local_rank", default=-1, type=int, help="local rank for distributed training")
+    parser.add_argument("--world_size", default=0, type=int, help="number of nodes for distributed training")
+    parser.add_argument("--local_rank", default=1, type=int, help="local rank for distributed training")
     parser.add_argument("--node_rank", default=0, type=int, help="node rank for distributed training")
     parser.add_argument("--nnodes", default=1, type=int)
     parser.add_argument("--nproc_per_node", default=1, type=int)
     parser.add_argument("--dist-backend", default="nccl", type=str, help="distributed backend")
-    parser.add_argument("--timeout", type=int, default=86400, help="time limit (s) to wait for other nodes in DDP")
+    parser.add_argument("--timeout", type=int, default=1, help="time limit (s) to wait for other nodes in DDP")
     return parser
 
 def parse_args():
@@ -108,9 +108,9 @@ if __name__ == "__main__":
 
     # Usual DDP setting
     static_graph = config.arch.type in STAGE_META_INR_ARCH_TYPE # use static_graph for high-order gradients in meta-learning
-    model = dist_utils.dataparallel_and_sync(distenv, model, static_graph=static_graph)
-    if model_ema is not None:
-        model_ema = dist_utils.dataparallel_and_sync(distenv, model_ema, static_graph=static_graph)
+    #model = dist_utils.dataparallel_and_sync(distenv, model, static_graph=static_graph)
+    #if model_ema is not None:
+    #    model_ema = dist_utils.dataparallel_and_sync(distenv, model_ema, static_graph=static_graph)
 
     trainer = create_trainer(config)
     trainer = trainer(model, model_ema, dataset_trn, dataset_val, config, writer, device, distenv)
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     else:
         trainer.run_epoch(optimizer, scheduler, epoch_st)
 
-    dist.barrier()
+    #dist.barrier()
 
     if distenv.master:
         writer.close()

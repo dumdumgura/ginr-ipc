@@ -23,6 +23,13 @@ class ImageNette(Dataset):
     """
 
     root = Path(__file__).parent.parent.parent.joinpath("data/imagenette")
+    """Dataset for ImageNette that contains 10 classes of ImageNet.
+    Dataset parses the pathes of images and load the image using PIL loader.
+
+    Args:
+        split: "train" or "val"
+        transform (sequence or torch.nn.Module): list of transformations
+    """
 
     def __init__(self, split="train", transform=None):
         assert split in ["train", "val"]
@@ -33,9 +40,12 @@ class ImageNette(Dataset):
         self.data_path = []
 
         for class_folder in class_folders:
-            filenames = sorted(os.listdir(os.path.join(root_path, class_folder)))
-            for name in filenames:
-                self.data_path.append(os.path.join(root_path, class_folder, name))
+            # for testing:
+            if class_folder == 'test':
+                filenames = sorted(os.listdir(os.path.join(root_path, class_folder)))
+                for name in filenames:
+                    self.data_path.append(os.path.join(root_path, class_folder, name))
+
 
     def __len__(self):
         return len(self.data_path)

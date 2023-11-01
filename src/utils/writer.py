@@ -22,6 +22,10 @@ class Writer:
 
         return writer
 
+    def add_mesh(self,mode,tag,vertices, colors=None, faces=None, config_dict=None, global_step=None, walltime=None):
+        writer = self._get_writer(mode)
+        writer.add_mesh(tag,vertices, colors, faces, config_dict, global_step, walltime)
+
     def add_scalar(self, tag, scalar, mode, epoch=0):
         writer = self._get_writer(mode)
         writer.add_scalar(tag, scalar, epoch)

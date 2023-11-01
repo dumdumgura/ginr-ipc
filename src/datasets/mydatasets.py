@@ -12,6 +12,38 @@ import torchaudio
 
 from .base import ImageFolder
 
+class ShapeNet(Dataset):
+    def __init__(
+        self,
+        dataset_folder,
+        split
+    ):
+        self.split = split
+        self.data_source = dataset_folder
+
+        files = [
+            file
+            for file in os.listdir(self.data_source)
+            if file not in ["train_split.lst", "test_split.lst", "val_split.lst"]
+        ]
+        self.npyfiles = files
+
+    def __len__(self):
+        return len(self.npyfiles)
+
+    def __getitem__(self, idx):
+        point_cloud = np.load(
+            os.path.join(self.data_source, self.npyfiles[idx]),
+        )
+        pts = point_cloud.shape[0]
+        coords = point_cloud[:,:3]
+        occs = point_cloud[:,3].reshape(pts,1)
+        return  {"coords": torch.from_numpy(coords).float(),
+            "occ": torch.from_numpy(occs)
+        }
+
+
+
 
 class ImageNette(Dataset):
     """Dataset for ImageNette that contains 10 classes of ImageNet.

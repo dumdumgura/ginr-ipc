@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from omegaconf import OmegaConf
-
+from .embedder import Embedder
 from ..configs import HypoNetConfig
 from .utils import create_params_with_init, create_activation
 
@@ -37,6 +37,16 @@ class HypoNet(nn.Module):
             assert self.ff_config.type is not None
             self.setup_fourier_mapping(ff_type=self.ff_config.type, trainable=self.ff_config.trainable)
 
+        #FFmaping for 3d and 4d
+        self.embedder = Embedder(
+            include_input=True,
+            input_dims=3,
+            max_freq_log2=self.ff_config.ff_sigma-1,
+            num_freqs=self.ff_config.ff_sigma,
+            log_sampling=True,
+            periodic_fns=[torch.sin, torch.cos],
+        )
+
         # after computes the shape of trainable parameters, initialize them
         self.params_dict = None
         self.params_shape_dict = self.compute_params_shape()
@@ -60,6 +70,8 @@ class HypoNet(nn.Module):
 
         if not ff_config.use_ff:
             fan_in = config.input_dim
+        elif ff_config.type=='3d':
+            fan_in = ff_config.ff_dim
         else:
             fan_in = ff_config.ff_dim * 2
 
@@ -109,6 +121,10 @@ class HypoNet(nn.Module):
         if ff_type == "deterministic_transinr":
             log_freqs = torch.linspace(0, np.log(ff_sigma), ff_dim // self.config.input_dim)
             self.ff_linear = torch.exp(log_freqs)
+        elif ff_type == "3d":
+            log_freqs = torch.linspace(0, np.log(ff_sigma), ff_dim // self.config.input_dim)
+            self.ff_linear = torch.exp(log_freqs)
+
         elif ff_type == "random_gaussian":
             self.ff_linear = torch.randn(self.config.input_dim, ff_dim) * ff_sigma  # scaler
         elif ff_type == "deterministic_transinr_nerf":
@@ -128,7 +144,7 @@ class HypoNet(nn.Module):
             fourier_features (torch.Tensor) : `ff_feature.shape == (B, -1, 2*ff_dim)`
         """
 
-        if self.ff_config.type in ["deterministic_transinr", "deterministic_transinr_nerf"]:
+        if self.ff_config.type in ["deterministic_transinr", "deterministic_transinr_nerf","3d"]:
             fourier_features = torch.matmul(coord.unsqueeze(-1), self.ff_linear.unsqueeze(0))
             fourier_features = fourier_features.view(*coord.shape[:-1], -1)
         else:
@@ -160,7 +176,10 @@ class HypoNet(nn.Module):
 
         batch_size, coord_shape, input_dim = coord.shape[0], coord.shape[1:-1], coord.shape[-1]
         coord = coord.view(batch_size, -1, input_dim)  # flatten the coordinates
-        hidden = self.fourier_mapping(coord) if self.use_ff else coord
+        if self.ff_config.type=='3d':
+            hidden = self.embedder.embed(coord)
+        else:
+            hidden = self.fourier_mapping(coord) if self.use_ff else coord
 
         for idx in range(self.config.n_layer):
             param_key = f"linear_wb{idx}"

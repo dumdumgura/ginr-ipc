@@ -7,6 +7,7 @@ from tqdm import tqdm
 from utils.accumulator import AccmStageINR
 from .trainer import TrainerTemplate
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,13 +39,16 @@ class Trainer(TrainerTemplate):
             pbar = enumerate(loader)
 
         model.eval()
-        for it, xs in pbar:
+        for it, xt in pbar:
             model.zero_grad()
 
-            xs = xs.to(self.device)  # [B, C, *]
+            if self.config.dataset.type == "shapenet":
+                coord_inputs = xt['coords'].to(self.device)
+                xs = xt['occ'].to(self.device)
+            else:
+                xs = xt.to(self.device)
+                coord_inputs = model.sample_coord_input(xs, device=xs.device)
 
-            #coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
-            coord_inputs = model.sample_coord_input(xs, device=xs.device)
 
             outputs, _, collated_history = model(xs, coord_inputs, is_training=False)
             targets = xs.detach()
@@ -74,7 +78,7 @@ class Trainer(TrainerTemplate):
             self.reconstruct(xs, epoch=0, mode=mode)
 
         summary = accm.get_summary(n_inst)
-        summary["xs"] = xs
+        summary["xs"] = xt
 
         return summary
 
@@ -92,12 +96,19 @@ class Trainer(TrainerTemplate):
             pbar = enumerate(self.loader_trn)
 
         model.train()
-        for it, xs in pbar:
+        for it, xt in pbar:
             model.zero_grad(set_to_none=True)
             #xs = xs.to(self.device, non_blocking=True)
-            xs = xs.to(self.device)
+
+            if self.config.dataset.type == "shapenet":
+                coord_inputs = xt['coords'].to(self.device)
+                xs = xt['occ'].to(self.device)
+            else:
+                xs = xt.to(self.device)
+                coord_inputs = model.sample_coord_input(xs, device=xs.device)
+
             #coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
-            coord_inputs = model.sample_coord_input(xs, device=xs.device)
+            #coord_inputs = model.sample_coord_input(xs, device=xs.device)
             #prediction
             outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True)
 
@@ -130,13 +141,50 @@ class Trainer(TrainerTemplate):
                 pbar.set_description(line)
 
         summary = accm.get_summary()
-        summary["xs"] = xs
+        summary["xs"] = xt
         return summary
 
     def logging(self, summary, scheduler=None, epoch=0, mode="train"):
         if epoch % 10 == 1 or epoch % self.config.experiment.test_imlog_freq == 0:
             #self.reconloggingstruct(summary["xs"], upsample_ratio=1, epoch=epoch, mode=mode)
-            self.reconstruct(summary["xs"], upsample_ratio=3, epoch=epoch, mode=mode)
+            if self.config.dataset.type == 'shapenet':
+                model = self.model
+                model.eval()
+                xs = summary["xs"]
+                coord_inputs = xs['coords'].to(self.device)
+                xs = xs['occ'].to(self.device)
+                vertices_tensor = torch.as_tensor([
+                    [1, 1, 1],
+                    [-1, -1, 1],
+                    [1, -1, -1],
+                    [-1, 1, -1],
+                ], dtype=torch.float).unsqueeze(0)
+                colors_tensor = torch.as_tensor([
+                    [255, 0, 0],
+                    [0, 255, 0],
+                    [0, 0, 255],
+                    [255, 0, 255],
+                ], dtype=torch.int).unsqueeze(0)
+                faces_tensor = torch.as_tensor([
+                    [0, 2, 3],
+                    [0, 3, 1],
+                    [0, 1, 2],
+                    [1, 3, 2],
+                ], dtype=torch.int).unsqueeze(0)
+
+                self.writer.add_mesh(mode=mode,tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor, faces=faces_tensor)
+
+                #xs_real = xs[:4]
+                # coord_inputs = model.module.sample_coord_input(xs_real, upsample_ratio=upsample_ratio, device=xs.device)
+                #xs_recon, _, collated_history = model(xs_real, coord_inputs, is_training=False)
+
+
+            else:
+                self.reconstruct(summary["xs"], upsample_ratio=3, epoch=epoch, mode=mode)
+
+
+
+
 
         self.writer.add_scalar("loss/loss_total", summary["loss_total"], mode, epoch)
         self.writer.add_scalar("loss/mse", summary["mse"], mode, epoch)
@@ -165,6 +213,7 @@ class Trainer(TrainerTemplate):
             epoch (int) : the number of epoch to be logged.
             mode (str) : the prefix for logging the result (e.g. "valid, "train")
         """
+
 
         def get_recon_imgs(xs_real, xs_recon, upsample_ratio=1):
             xs_real = xs_real

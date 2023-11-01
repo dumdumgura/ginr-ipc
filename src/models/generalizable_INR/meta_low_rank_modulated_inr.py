@@ -147,8 +147,9 @@ class MetaLowRankModulatedINR(TransINR):
 
         # predict all pixels of coord after applying the modulation_parms into hyponet
         outputs = self.hyponet(coord, modulation_params_dict=modulation_params_dict)
-        permute_idx_range = [i for i in range(1, xs.ndim - 1)]
-        outputs = outputs.permute(0, -1, *permute_idx_range)
+        if self.config.hyponet.fourier_mapping.type !='3d':
+            permute_idx_range = [i for i in range(1, xs.ndim - 1)]
+            outputs = outputs.permute(0, -1, *permute_idx_range)
         return outputs
 
     def inner_step(
@@ -194,12 +195,13 @@ class MetaLowRankModulatedINR(TransINR):
         }
         return new_modulation_factors_dict, logs
 
-    def inner_loop(self, xs, n_inner_step=1, inner_lr=0.1, is_training=True):
+    def inner_loop(self, xs, coord=None, n_inner_step=1, inner_lr=0.1, is_training=True):
         r"""A loop of latent adaptation steps, served as the inner loop of meta-learning."""
 
         # We assume that inner loop uses the coords of shape identical to the spatial shape of xs, while not using
         # coordinate subsampling. For this reason, we compute `coord` from `xs` in the inner loop.
-        coord = self.sample_coord_input(xs)
+        coord = self.sample_coord_input(xs)if coord is None else coord
+
         modulation_factors_dict = self.get_init_modulation_factors(xs)
 
         inner_loop_history = []
@@ -251,7 +253,7 @@ class MetaLowRankModulatedINR(TransINR):
         is_training = self.training if is_training is None else is_training
 
         modulation_factors_dict, inner_loop_history = self.inner_loop(
-            xs, n_inner_step=n_inner_step, inner_lr=inner_lr, is_training=is_training
+            xs, coord = coord, n_inner_step=n_inner_step, inner_lr=inner_lr, is_training=is_training
         )
         outputs = self.predict_with_modulation_factors(xs, modulation_factors_dict, coord)
         collated_history = self._collate_inner_loop_history(inner_loop_history)

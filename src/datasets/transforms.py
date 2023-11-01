@@ -51,8 +51,10 @@ def create_transforms(config, split="train", is_eval=False):
         resolution = int(config.transforms.type.split("x")[-1])
         if split == "train" and not is_eval:
             transforms_ = [
-                transforms.RandomCrop(resolution),
-                transforms.RandomHorizontalFlip(),
+                transforms.Resize(resolution),
+                #transforms.RandomCrop(resolution),
+                transforms.CenterCrop(resolution),
+                #transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
             ]
         else:
@@ -96,6 +98,9 @@ def create_transforms(config, split="train", is_eval=False):
                     random_crop=False,
                 ),
             ]
+    elif config.transforms.type in ["shapenet"]:
+        return True
+
     else:
         raise NotImplementedError("%s not implemented.." % config.transforms.type)
 

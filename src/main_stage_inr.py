@@ -17,13 +17,13 @@ from utils.setup import setup
 
 def default_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/imagenette178_meta_low_rank.yaml")
-    parser.add_argument("-r", "--result-path", type=str, default="./results.tmp")
-    parser.add_argument("-l", "--load-path", type=str, default="/home/umaru/praktikum/changed_version/ginr-ipc/results.tmp/imagenette178_meta_low_rank/31102023_121140/epoch6000_model.pt")
+    parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
+    parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/shapenet")
+    parser.add_argument("-l", "--load-path", type=str, default="")
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--eval", action="store_true")
-    parser.add_argument("--resume", action="store_true",default=True)
+    parser.add_argument("--resume", action="store_true",default=False)
     return parser
 
 def add_dist_arguments(parser):

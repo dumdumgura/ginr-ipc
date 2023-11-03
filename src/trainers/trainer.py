@@ -107,6 +107,7 @@ class TrainerTemplate:
 
                 if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
                     self.logging(summary_val, scheduler=scheduler, epoch=i + 1, mode="valid")
+
                     if self.model_ema is not None:
                         self.logging(summary_val_ema, scheduler=scheduler, epoch=i + 1, mode="valid_ema")
 

@@ -109,7 +109,7 @@ class TransINR(nn.Module):
     def encode_latent(self, xs_embed):
         return self.latent_mapping(xs_embed)
 
-    def compute_loss(self, preds, targets, reduction="mean"):
+    def compute_loss(self, preds, targets, reduction="ce",modulation_list=None,reg=None):
         assert reduction in ["mean", "sum", "ce","none"]
         batch_size = preds.shape[0]
         sample_mses = torch.reshape((preds - targets) ** 2, (batch_size, -1)).mean(dim=-1)
@@ -122,14 +122,22 @@ class TransINR(nn.Module):
             psnr = (-10 * torch.log10(sample_mses)).sum()
         elif reduction == "ce":
             threshold = 1e-12
+            #elementwise operation: sigmoid
             logits =1.0 / (1 + torch.exp(-preds))
             logits = torch.clamp(logits, min=threshold)
 
+            #binary cross entropy loss- element for each points
             total_loss = -targets * torch.log(logits)   -  (1-targets)* torch.log(1-logits)
-
             total_loss = torch.clamp(total_loss, min=threshold)
+            total_loss = torch.reshape(total_loss, (batch_size, -1)).mean(dim=-1)
 
-            total_loss = torch.reshape(total_loss, (batch_size, -1)).mean(dim=-1).sum()
+            #regularization:
+            if modulation_list is not None:
+                for i,factor in enumerate(modulation_list):
+                    #total_loss = total_loss + reg* factor.norm(dim=[1, 2])
+                    pass
+
+            total_loss=total_loss.sum()
             psnr = -10 * torch.log10(total_loss)
             pass
         else:

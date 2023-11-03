@@ -143,7 +143,7 @@ def create_meshes(
     modulation_params_dict,
     filename=None,
     N=256,
-    max_batch=10**3,
+    max_batch=10**4,
     offset=None,
     scale=None,
     level=0,
@@ -201,7 +201,7 @@ def create_meshes(
         head += max_batch
 
     meshes=[]
-    tmp={}
+    tmp = {}
     for i in range(batch):
         sdf_values = samples[i,:, 3]
         sdf_values = sdf_values.reshape(N, N, N)
@@ -215,6 +215,7 @@ def create_meshes(
             scale,
         )
         meshes.append(tmp)
+        tmp={}
 
     end = time.time()
     print("sampling takes: %f" % (end - start))

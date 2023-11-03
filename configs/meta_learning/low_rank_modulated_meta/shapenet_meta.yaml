@@ -10,12 +10,13 @@ arch: # needs to add encoder, modulation type
   type: meta_low_rank_modulated_inr
   ema: null
 
-  rank: [256] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
+  rank: [128] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
   modulated_layer_idxs: [1]
   use_factorization: false
 
-  n_inner_step: 1
-  inner_lr: 0.001
+  n_inner_step: 3
+  inner_lr: 0.0005
+
 
   coord_sampler:
     data_type: image
@@ -26,7 +27,7 @@ arch: # needs to add encoder, modulation type
   hyponet:
     type: mlp
     n_layer: 4 # including the output layer
-    hidden_dim: [256] # list, assert len(hidden_dim) in [1, n_layers-1]
+    hidden_dim: [128,128,128] # list, assert len(hidden_dim) in [1, n_layers-1]
     use_bias: true
     input_dim: 3
     output_dim: 1
@@ -35,8 +36,8 @@ arch: # needs to add encoder, modulation type
       type: 3d
       trainable: false
       use_ff: true
-      ff_sigma: 42 # ff_dim = 2*ff_sigma *3 + (3)
-      ff_dim: 255
+      ff_sigma: 4 # ff_dim = 2*ff_sigma *3 + (3)
+      ff_dim: 27
 
     activation:
       type: relu
@@ -56,23 +57,24 @@ loss:
 optimizer:
   type: adam
   init_lr: 0.001
-  weight_decay: 0.001
-  betas: [0.9, 0.999] #[0.9, 0.95]
+  weight_decay: 0.1
+  betas: [0.9, 0.95] #[0.9, 0.95]
   warmup:
     epoch: 0
     multiplier: 1
     buffer_epoch: 0
-    min_lr: 0.0001
+    min_lr: 0.00001
     mode: fix
     start_from_zero: True
-  max_gn: null
+  max_gn: 1e-3
 
 experiment:
   amp: True
-  batch_size: 1
-  total_batch_size: 1
-  epochs: 10000
-  save_ckpt_freq: 20
-  test_freq: 10
-  test_imlog_freq: 200
+  batch_size: 8
+  total_batch_size: 16
+  epochs: 5000
+  epochs_cos: 2500
+  save_ckpt_freq: 2000
+  test_freq: 100
+  test_imlog_freq: 300
 

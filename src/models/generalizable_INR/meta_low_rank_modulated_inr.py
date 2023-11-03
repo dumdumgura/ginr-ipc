@@ -166,7 +166,7 @@ class MetaLowRankModulatedINR(TransINR):
         # predict all pixels of coord after applying the modulation_parms into hyponet
 
         meshes=create_meshes(
-            self.hyponet,modulation_params_dict,level=0.0, N=32
+            self.hyponet,modulation_params_dict,level=0.0, N=128
         )
         return meshes
 
@@ -184,13 +184,14 @@ class MetaLowRankModulatedINR(TransINR):
             # compute reconstruction
             recons = self.predict_with_modulation_factors(xs, modulation_factors_dict, coord)
 
-            # compute the loss
-            # reduction should be "sum" here, since we are computing per-sample gradient
-            metrics = self.compute_loss(recons, xs, reduction="ce")
-
-            # compute gradient w.r.t. latents
             factor_names = list(modulation_factors_dict.keys())
             modulation_factors_list = list(modulation_factors_dict.values())
+
+            # compute the loss
+            # reduction should be "sum" here, since we are computing per-sample gradient
+            metrics = self.compute_loss(recons, xs, reduction="ce",modulation_list=modulation_factors_list,reg=0.001)
+
+            # compute gradient w.r.t. latents
             grads_list = torch.autograd.grad(metrics["loss_total"], modulation_factors_list, create_graph=is_training)
 
             # take an SGD step
@@ -198,10 +199,24 @@ class MetaLowRankModulatedINR(TransINR):
             for name, factor, grad in zip(factor_names, modulation_factors_list, grads_list):
                 if self.config.hyponet.normalize_weight:
                     lr_scale = factor.norm(dim=[1, 2], keepdim=True).pow(2.0)
+                    #lr_scale = 1.0
+                    #lr_scale = 1.0 / grad.norm().pow(2.0)
                 else:
                     lr_scale = 1.0
-                print(factor.norm())
-                new_factor = factor - inner_lr * lr_scale * grad
+
+                #print("factor_norm:"+str(factor.norm(dim=[1, 2], keepdim=True).mean().item()/factor.shape[0]))
+                #print("grad_factor:"+str(grad.norm(dim=[1, 2], keepdim=True).mean().item()/grad.shape[0]))
+
+                if grad.norm()>=1e2:
+                    print("grad>1e2")
+                    #new_factor = factor
+                    new_factor = factor - inner_lr * lr_scale * grad
+                else:
+                    new_factor = factor - inner_lr * lr_scale * grad
+                #print("new_factor_norm:" + str(new_factor.norm(dim=[1, 2], keepdim=True).mean().item()/factor.shape[0]))
+
+                #print("-------")
+                #print("-------")
                 new_modulation_factors_dict[name] = new_factor
 
         # only for logging
@@ -268,6 +283,7 @@ class MetaLowRankModulatedINR(TransINR):
         """
 
         coord = self.sample_coord_input(xs) if coord is None else coord
+
         n_inner_step = self.n_inner_step if n_inner_step is None else n_inner_step
         inner_lr = self.inner_lr if inner_lr is None else inner_lr
         is_training = self.training if is_training is None else is_training
@@ -277,9 +293,10 @@ class MetaLowRankModulatedINR(TransINR):
         )
         outputs = self.predict_with_modulation_factors(xs, modulation_factors_dict, coord)
 
+        collated_history = self._collate_inner_loop_history(inner_loop_history)
+
         if vis:
             visuals = self.decode_with_modulation_factors(xs, modulation_factors_dict, coord)
-            return visuals
-
-        collated_history = self._collate_inner_loop_history(inner_loop_history)
-        return outputs, modulation_factors_dict, collated_history
+            return outputs, visuals, collated_history
+        else:
+            return outputs, modulation_factors_dict, collated_history

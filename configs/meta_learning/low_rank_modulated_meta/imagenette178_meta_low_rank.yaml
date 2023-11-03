@@ -9,7 +9,7 @@ arch: # needs to add encoder, modulation type
   type: meta_low_rank_modulated_inr
   ema: null
 
-  rank: [256] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
+  rank: [128] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
   modulated_layer_idxs: [1]
   use_factorization: true
 
@@ -24,8 +24,8 @@ arch: # needs to add encoder, modulation type
 
   hyponet:
     type: mlp
-    n_layer: 5 # including the output layer
-    hidden_dim: [256] # list, assert len(hidden_dim) in [1, n_layers-1]
+    n_layer: 4 # including the output layer
+    hidden_dim: [128] # list, assert len(hidden_dim) in [1, n_layers-1]
     use_bias: true
     input_dim: 2
     output_dim: 3
@@ -34,8 +34,8 @@ arch: # needs to add encoder, modulation type
       type: deterministic_transinr
       trainable: false
       use_ff: true
-      ff_sigma: 128
-      ff_dim: 128
+      ff_sigma: 64
+      ff_dim: 64
     activation:
       type: relu
       siren_w0: null
@@ -67,8 +67,8 @@ optimizer:
 
 experiment:
   amp: True
-  batch_size: 6
-  total_batch_size: 12
+  batch_size: 3
+  total_batch_size: 3
   epochs: 10000
   save_ckpt_freq: 1000
   test_freq: 100

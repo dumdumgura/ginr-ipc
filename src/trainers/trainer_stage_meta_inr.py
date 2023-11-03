@@ -28,6 +28,38 @@ class Trainer(TrainerTemplate):
         return accm
 
     @torch.no_grad()
+
+    def reconstruct_shape(self,meshes,epoch,it):
+        for k in range(len(meshes)):
+            # try writing to the ply file
+            verts = meshes[k]['vertices']
+            faces = meshes[k]['faces']
+            voxel_grid_origin = [-0.5] * 3
+            mesh_points = np.zeros_like(verts)
+            mesh_points[:, 0] = voxel_grid_origin[0] + verts[:, 0]
+            mesh_points[:, 1] = voxel_grid_origin[1] + verts[:, 1]
+            mesh_points[:, 2] = voxel_grid_origin[2] + verts[:, 2]
+
+            num_verts = verts.shape[0]
+            num_faces = faces.shape[0]
+
+            verts_tuple = np.zeros((num_verts,), dtype=[("x", "f4"), ("y", "f4"), ("z", "f4")])
+
+            for i in range(0, num_verts):
+                verts_tuple[i] = tuple(mesh_points[i, :])
+
+            faces_building = []
+            for i in range(0, num_faces):
+                faces_building.append(((faces[i, :].tolist(),)))
+            faces_tuple = np.array(faces_building, dtype=[("vertex_indices", "i4", (3,))])
+
+            el_verts = plyfile.PlyElement.describe(verts_tuple, "vertex")
+            el_faces = plyfile.PlyElement.describe(faces_tuple, "face")
+
+            ply_data = plyfile.PlyData([el_verts, el_faces])
+            # logging.debug("saving mesh to %s" % (ply_filename_out))
+            ply_data.write("./results.tmp/ply/" + str(epoch) + "_" + str(it*len(meshes)+k) + "_poly.ply")
+
     def eval(self, valid=True, ema=False, verbose=False, epoch=0):
         model = self.model_ema if ema else self.model
         loader = self.loader_val if valid else self.loader_trn
@@ -52,7 +84,15 @@ class Trainer(TrainerTemplate):
                 coord_inputs = model.sample_coord_input(xs, device=xs.device)
 
 
-            outputs, _, collated_history = model(xs, coord_inputs, is_training=False)
+            vis = False
+            if self.config.dataset.type == 'shapenet':
+                vis = True
+                outputs, meshes, collated_history = model(xs, coord_inputs, is_training=False,vis=vis)
+                self.reconstruct_shape(meshes,epoch,it)
+            else:
+                outputs, _, collated_history = model(xs, coord_inputs, is_training=False, vis=vis)
+
+
             targets = xs.detach()
 
             #loss = model.module.compute_loss(outputs, targets, reduction="sum")
@@ -77,7 +117,7 @@ class Trainer(TrainerTemplate):
             mode = "valid" if valid else "train"
             mode = "%sudo apt install python3.7s_ema" % mode if ema else mode
             logger.info(f"""{mode:10s}, """ + line)
-            self.reconstruct(xs, epoch=0, mode=mode)
+            #self.reconstruct(xs, epoch=0, mode=mode)
 
         summary = accm.get_summary(n_inst)
         summary["xs"] = xt
@@ -147,7 +187,7 @@ class Trainer(TrainerTemplate):
         return summary
 
     def logging(self, summary, scheduler=None, epoch=0, mode="train"):
-        if epoch % 10 == 1 or epoch % self.config.experiment.test_imlog_freq == 0:
+        if epoch % 100 == 1 or epoch % self.config.experiment.test_imlog_freq == 0:
             #self.reconloggingstruct(summary["xs"], upsample_ratio=1, epoch=epoch, mode=mode)
             if self.config.dataset.type == 'shapenet':
                 model = self.model
@@ -158,34 +198,6 @@ class Trainer(TrainerTemplate):
 
                 meshes=model(xs,coords,is_training=False,vis=True)
 
-                # try writing to the ply file
-                verts = meshes[0]['vertices']
-                faces = meshes[0]['faces']
-                voxel_grid_origin = [-0.5] * 3
-                mesh_points = np.zeros_like(verts)
-                mesh_points[:, 0] = voxel_grid_origin[0] + verts[:, 0]
-                mesh_points[:, 1] = voxel_grid_origin[1] + verts[:, 1]
-                mesh_points[:, 2] = voxel_grid_origin[2] + verts[:, 2]
-
-                num_verts = verts.shape[0]
-                num_faces = faces.shape[0]
-
-                verts_tuple = np.zeros((num_verts,), dtype=[("x", "f4"), ("y", "f4"), ("z", "f4")])
-
-                for i in range(0, num_verts):
-                    verts_tuple[i] = tuple(mesh_points[i, :])
-
-                faces_building = []
-                for i in range(0, num_faces):
-                    faces_building.append(((faces[i, :].tolist(),)))
-                faces_tuple = np.array(faces_building, dtype=[("vertex_indices", "i4", (3,))])
-
-                el_verts = plyfile.PlyElement.describe(verts_tuple, "vertex")
-                el_faces = plyfile.PlyElement.describe(faces_tuple, "face")
-
-                ply_data = plyfile.PlyData([el_verts, el_faces])
-                #logging.debug("saving mesh to %s" % (ply_filename_out))
-                ply_data.write("poly.ply")
 
 
 
@@ -215,7 +227,7 @@ class Trainer(TrainerTemplate):
 
 
                 for i in range(len(meshes)):
-
+                    break
                     vertices_tensor = torch.as_tensor(meshes[i]['vertices'].copy(), dtype=torch.int).unsqueeze(0)
                     faces_tensor=torch.as_tensor(meshes[i]['faces'].copy(), dtype=torch.int).unsqueeze(0)
                     color = np.array([[255, 154, 234]])
@@ -268,7 +280,7 @@ class Trainer(TrainerTemplate):
             xs_real = xs_real
             if not upsample_ratio == 1:
                 xs_real = torch.nn.functional.interpolate(xs_real, scale_factor=upsample_ratio)
-            xs_recon = xs_recon
+                xs_recon = torch.nn.functional.interpolate(xs_recon, scale_factor=upsample_ratio)
             xs_recon = torch.clamp(xs_recon, 0, 1)
             return xs_real, xs_recon
 
@@ -277,11 +289,12 @@ class Trainer(TrainerTemplate):
 
         assert upsample_ratio > 0
 
-        xs_real = xs[:4]
+        xs_real = xs[:4].to(self.device)
         #coord_inputs = model.module.sample_coord_input(xs_real, upsample_ratio=upsample_ratio, device=xs.device)
-        coord_inputs = model.sample_coord_input(xs_real, upsample_ratio=upsample_ratio, device=xs.device)
+        coord_inputs = model.sample_coord_input(xs_real, device=self.device)
 
         xs_recon, _, collated_history = model(xs_real, coord_inputs, is_training=False)
+
         xs_real, xs_recon = get_recon_imgs(xs_real, xs_recon, upsample_ratio)
 
         grid = []

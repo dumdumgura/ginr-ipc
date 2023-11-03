@@ -18,7 +18,8 @@ from utils.setup import setup
 def default_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
-    parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/shapenet")
+    parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/")
+    parser.add_argument("-t", "--task", type=str, default="shapenettest_opt_3layer_1ccsad")
     parser.add_argument("-l", "--load-path", type=str, default="")
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)
@@ -89,7 +90,7 @@ if __name__ == "__main__":
 
         optimizer = create_optimizer(model, config)
         scheduler = create_scheduler(
-            optimizer, config.optimizer.warmup, steps_per_epoch, config.experiment.epochs, distenv
+            optimizer, config.optimizer.warmup, steps_per_epoch, config.experiment.epochs_cos, distenv
         )
         
         if distenv.master:

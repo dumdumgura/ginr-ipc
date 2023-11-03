@@ -52,6 +52,7 @@ def setup(args, extra_args=()):
     args.model_config = Path(args.model_config).absolute().resolve().as_posix()
 
     now = datetime.now().strftime("%d%m%Y_%H%M%S")
+    now =args.task
 
     if args.eval:
         config_path = Path(args.result_path).joinpath("config.yaml")

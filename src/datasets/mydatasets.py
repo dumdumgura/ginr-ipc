@@ -19,7 +19,8 @@ class ShapeNet(Dataset):
         split
     ):
         self.split = split
-        self.data_source = dataset_folder
+
+        self.data_source = os.path.join(dataset_folder, split)
 
         files = [
             file

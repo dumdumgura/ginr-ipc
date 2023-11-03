@@ -122,13 +122,17 @@ class TransINR(nn.Module):
             psnr = (-10 * torch.log10(sample_mses)).sum()
         elif reduction == "ce":
             threshold = 1e-12
+            threshold_max = 1e2
             #elementwise operation: sigmoid
-            logits =1.0 / (1 + torch.exp(-preds))
-            logits = torch.clamp(logits, min=threshold)
-
+            #logits =1.0 / (1 + torch.exp(-preds))
+            #logits = torch.clamp(logits, min=threshold)
+            #if torch.count_nonzero(logits==0):
+            #    print("logits=0")
             #binary cross entropy loss- element for each points
-            total_loss = -targets * torch.log(logits)   -  (1-targets)* torch.log(1-logits)
-            total_loss = torch.clamp(total_loss, min=threshold)
+            #total_loss = -targets * torch.log(logits)   -  (1-targets)* torch.log(1-logits)
+            #total_loss = torch.clamp(total_loss, min=threshold,max=threshold_max)
+
+            total_loss = torch.nn.BCEWithLogitsLoss(reduction='none')(preds, targets)
             total_loss = torch.reshape(total_loss, (batch_size, -1)).mean(dim=-1)
 
             #regularization:
@@ -144,7 +148,9 @@ class TransINR(nn.Module):
             total_loss = sample_mses
             psnr = -10 * torch.log10(sample_mses)
 
-
+        if torch.isnan(total_loss):
+            print('a')
+            pass
 
         return {"loss_total": total_loss, "mse": total_loss, "psnr": psnr}
 

@@ -156,7 +156,14 @@ class Trainer(TrainerTemplate):
 
             targets = xs.detach()
             #loss = model.module.compute_loss(outputs, targets)
-            loss = model.compute_loss(outputs, targets,'ce')
+
+            if self.config.arch.hyponet.fourier_mapping in ['deterministic_transinr']:
+                loss_type = 'mean'
+            else:
+                loss_type = 'ce'
+            loss = model.compute_loss(outputs, targets,loss_type)
+
+
             loss["loss_total"].backward()
             if self.config.optimizer.max_gn is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), self.config.optimizer.max_gn)

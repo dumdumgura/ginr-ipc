@@ -17,9 +17,10 @@ from utils.setup import setup
 
 def default_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
+    #parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/imagenette178_meta_low_rank.yaml")
+    parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/")
-    parser.add_argument("-t", "--task", type=str, default="shapenettest_opt_3layer_1ccsad")
+    parser.add_argument("-t", "--task", type=str, default="shapenettest_opt_3layaq2qaqaa")
     parser.add_argument("-l", "--load-path", type=str, default="")
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)

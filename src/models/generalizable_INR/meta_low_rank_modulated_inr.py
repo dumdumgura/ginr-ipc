@@ -189,7 +189,11 @@ class MetaLowRankModulatedINR(TransINR):
 
             # compute the loss
             # reduction should be "sum" here, since we are computing per-sample gradient
-            metrics = self.compute_loss(recons, xs, reduction="ce",modulation_list=modulation_factors_list,reg=0.001)
+            if self.config.hyponet.fourier_mapping.type in ['deterministic_transinr']:
+                loss_type = 'mean'
+            else:
+                loss_type = 'ce'
+            metrics = self.compute_loss(recons, xs, reduction=loss_type,modulation_list=modulation_factors_list,reg=0.001)
 
             # compute gradient w.r.t. latents
             grads_list = torch.autograd.grad(metrics["loss_total"], modulation_factors_list, create_graph=is_training)

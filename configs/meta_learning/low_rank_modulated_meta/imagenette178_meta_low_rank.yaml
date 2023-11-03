@@ -70,7 +70,9 @@ experiment:
   batch_size: 3
   total_batch_size: 3
   epochs: 10000
+  epochs_cos: 2500
+
   save_ckpt_freq: 1000
-  test_freq: 100
+  test_freq: 1000
   test_imlog_freq: 100
 

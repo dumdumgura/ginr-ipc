@@ -33,7 +33,7 @@ class ShapeNet(Dataset):
 
     def __getitem__(self, idx):
         point_cloud = np.load(
-            os.path.join(self.data_source, self.npyfiles[idx]),
+            os.path.join(self.data_source, self.npyfiles[idx]),allow_pickle=True
         )
         pts = point_cloud.shape[0]
         coords = point_cloud[:,:3]

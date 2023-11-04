@@ -73,6 +73,6 @@ experiment:
   epochs_cos: 2500
 
   save_ckpt_freq: 1000
-  test_freq: 1000
+  test_freq: 100
   test_imlog_freq: 100
 

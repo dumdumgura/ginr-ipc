@@ -12,9 +12,9 @@ arch: # needs to add encoder, modulation type
 
   rank: [128] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
   modulated_layer_idxs: [1]
-  use_factorization: false
+  use_factorization: true
 
-  n_inner_step: 3
+  n_inner_step: 4
   inner_lr: 0.003
 
 
@@ -26,8 +26,8 @@ arch: # needs to add encoder, modulation type
 
   hyponet:
     type: mlp
-    n_layer: 4 # including the output layer
-    hidden_dim: [128] # list, assert len(hidden_dim) in [1, n_layers-1]
+    n_layer: 6 # including the output layer
+    hidden_dim: [256,256,256,128,128] # list, assert len(hidden_dim) in [1, n_layers-1]
     use_bias: true
     input_dim: 3
     output_dim: 1
@@ -63,18 +63,18 @@ optimizer:
     epoch: 0
     multiplier: 1
     buffer_epoch: 0
-    min_lr: 0.0001
+    min_lr: 0.000001
     mode: fix
     start_from_zero: True
   max_gn: null
 
 experiment:
   amp: True
-  batch_size: 1
-  total_batch_size: 1
-  epochs: 5000
-  epochs_cos: 2500
+  batch_size: 4
+  total_batch_size: 4
+  epochs: 100
+  epochs_cos: 50
   save_ckpt_freq: 2000
-  test_freq: 100
+  test_freq: 10
   test_imlog_freq: 300
 

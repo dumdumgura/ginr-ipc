@@ -153,7 +153,7 @@ class MetaLowRankModulatedINR(TransINR):
 
 
         #for overfit:
-        self.modulated_vectors_overfit=self.init_modulated_vectors()
+        #self.modulated_vectors_overfit=self.init_modulated_vectors()
 
     def init_modulated_vectors(self):
         modulation_factors_dict = self.factors.init_modulation_factors

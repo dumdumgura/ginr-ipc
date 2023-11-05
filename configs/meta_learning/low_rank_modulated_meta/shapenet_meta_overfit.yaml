@@ -1,4 +1,4 @@
-type: generalize
+type: overfit
 trainer: stage_inr
 dataset:
   type: shapenet

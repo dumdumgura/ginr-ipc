@@ -95,6 +95,25 @@ class ModulatedParamsFactors(nn.Module):
 
         return modulation_params_dict
 
+    def compute_modulation_params_dict_overfit(self, modulation_factors_dict):
+        r"""Computes modulation param W by multiplying shared factor U and modulation factor V.
+        If shared factor U is None (i.e. `use_factorization` was False), W = V.
+        """
+        modulation_params_dict = {}
+
+        for name, modulation_factor in modulation_factors_dict.items():
+            shared_factor = self.shared_factors[name]
+            if shared_factor is not None:
+                modulation_param = (modulation_factor * shared_factor)
+            else:
+                modulation_param = modulation_factor
+            modulation_params_dict[name] = modulation_param
+
+        return modulation_params_dict
+
+
+
+
     @property
     def modulated_param_names(self):
         return list(self.shared_factors.keys())
@@ -132,6 +151,15 @@ class MetaLowRankModulatedINR(TransINR):
         self.n_inner_step = self.config.n_inner_step
         self.inner_lr = self.config.inner_lr
 
+
+        #for overfit:
+        self.modulated_vectors_overfit=self.init_modulated_vectors()
+
+    def init_modulated_vectors(self):
+        modulation_factors_dict = self.factors.init_modulation_factors
+        modulation_params_dict = self.factors.compute_modulation_params_dict_overfit(modulation_factors_dict)
+        return modulation_params_dict
+
     @torch.enable_grad()
     def get_init_modulation_factors(self, xs: Tensor):
         r"""Returns the initial modulation factors."""
@@ -140,6 +168,7 @@ class MetaLowRankModulatedINR(TransINR):
             name: repeat_along_batch_dim(factor, xs.shape[0]) for name, factor in modulation_factors_dict.items()
         }
         return modulation_factors_dict
+
 
     def predict_with_modulation_factors(self, xs, modulation_factors_dict, coord=None):
         r"""Inference function on Hyponet, modulated via given modulation factors."""
@@ -150,10 +179,13 @@ class MetaLowRankModulatedINR(TransINR):
 
         # predict all pixels of coord after applying the modulation_parms into hyponet
         outputs = self.hyponet(coord, modulation_params_dict=modulation_params_dict)
+
         if self.config.hyponet.fourier_mapping.type !='3d':
             permute_idx_range = [i for i in range(1, xs.ndim - 1)]
             outputs = outputs.permute(0, -1, *permute_idx_range)
+
         return outputs
+
 
     def decode_with_modulation_factors(self, xs, modulation_factors_dict, coord=None):
         r"""Inference function on Hyponet, modulated via given modulation factors."""
@@ -304,3 +336,19 @@ class MetaLowRankModulatedINR(TransINR):
             return outputs, visuals, collated_history
         else:
             return outputs, modulation_factors_dict, collated_history
+
+    def overfit_one_shape(self, coord, xs, modulation_factors_dict):
+
+
+        #get the modulation param
+        modulation_factors_dict = self.get_init_modulation_factors(xs)
+        # convert modulation factors into modulation params
+        modulation_params_dict = self.factors.compute_modulation_params_dict_overfit(modulation_factors_dict)
+
+        #inner_loop_history = []
+        outputs = self.hyponet.forward_overfit(coord, modulation_params_dict=modulation_params_dict)
+        #inner_loop_history.append(logs)
+        # only for logging
+
+        return outputs
+

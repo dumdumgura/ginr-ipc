@@ -2,7 +2,7 @@ import os
 
 import torch
 
-from .mydatasets import ImageNette, FFHQ, ImageOnlyDataset, LearnitShapenet, LibriSpeech, Celeba, ShapeNet
+from .mydatasets import ImageNette, FFHQ, ImageOnlyDataset, LearnitShapenet, LibriSpeech, Celeba, ShapeNet,Pointcloud
 from .transforms import create_transforms
 
 SMOKE_TEST = bool(os.environ.get("SMOKE_TEST", 0))
@@ -12,9 +12,14 @@ def create_dataset(config, is_eval=False, logger=None):
     transforms_trn = create_transforms(config.dataset, split="train", is_eval=is_eval)
     transforms_val = create_transforms(config.dataset, split="val", is_eval=is_eval)
 
+
     if config.dataset.type =="shapenet":
-        dataset_trn = ShapeNet(config.dataset.folder, split="train")
-        dataset_val = ShapeNet(config.dataset.folder, split="val")
+        if config.type == 'overfit':
+            dataset_trn = Pointcloud(config.dataset.folder, split="train")
+            dataset_val = Pointcloud(config.dataset.folder, split="val")
+        else:
+            dataset_trn = ShapeNet(config.dataset.folder, split="train")
+            dataset_val = ShapeNet(config.dataset.folder, split="val")
 
     elif config.dataset.type == "imagenette":
         dataset_trn = ImageNette(split="train", transform=transforms_trn)

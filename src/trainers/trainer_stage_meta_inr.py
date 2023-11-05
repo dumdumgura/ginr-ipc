@@ -29,7 +29,7 @@ class Trainer(TrainerTemplate):
 
     @torch.no_grad()
 
-    def reconstruct_shape(self,meshes,epoch,it):
+    def reconstruct_shape(self,meshes,epoch,it=1,mode='train'):
         for k in range(len(meshes)):
             # try writing to the ply file
             verts = meshes[k]['vertices']
@@ -58,7 +58,7 @@ class Trainer(TrainerTemplate):
 
             ply_data = plyfile.PlyData([el_verts, el_faces])
             # logging.debug("saving mesh to %s" % (ply_filename_out))
-            ply_data.write("./results.tmp/ply/" + str(epoch) + "_" + str(it*len(meshes)+k) + "_poly.ply")
+            ply_data.write("./results.tmp/ply/" + str(epoch) + "_" +str(mode)+"_"+ str(it*len(meshes)+k) + "_poly.ply")
 
     def eval(self, valid=True, ema=False, verbose=False, epoch=0):
         model = self.model_ema if ema else self.model
@@ -88,7 +88,7 @@ class Trainer(TrainerTemplate):
             if self.config.dataset.type == 'shapenet':
                 vis = True
                 outputs, meshes, collated_history = model(xs, coord_inputs, is_training=False,vis=vis)
-                self.reconstruct_shape(meshes,epoch,it)
+                #self.reconstruct_shape(meshes,epoch,it)
             else:
                 outputs, _, collated_history = model(xs, coord_inputs, is_training=False, vis=vis)
 
@@ -96,7 +96,7 @@ class Trainer(TrainerTemplate):
             targets = xs.detach()
 
             #loss = model.module.compute_loss(outputs, targets, reduction="sum")
-            loss = model.compute_loss(outputs, targets, reduction="sum")
+            loss = model.compute_loss(outputs, targets, reduction="ce")
 
             metrics = dict(
                 loss_total=loss["loss_total"],
@@ -152,7 +152,10 @@ class Trainer(TrainerTemplate):
             #coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
             #coord_inputs = model.sample_coord_input(xs, device=xs.device)
             #prediction
-            outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True)
+            if self.config.type is not None and self.config.type == 'overfit':
+                outputs = model.overfit_one_shape(xs, coord=coord_inputs, is_training=True)
+            else:
+                outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True)
 
             targets = xs.detach()
             #loss = model.module.compute_loss(outputs, targets)
@@ -177,8 +180,8 @@ class Trainer(TrainerTemplate):
                 loss_total=loss["loss_total"],
                 mse=loss["mse"],
                 psnr=loss["psnr"],
-                inner_mse=collated_history["mse"] / xs.shape[0],
-                inner_psnr=collated_history["psnr"] / xs.shape[0],
+                #inner_mse=collated_history["mse"] / xs.shape[0],
+                #inner_psnr=collated_history["psnr"] / xs.shape[0],
             )
             accm.update(metrics, count=1)
             total_step += 1
@@ -203,55 +206,24 @@ class Trainer(TrainerTemplate):
                 coords = xs['coords'].to(self.device)
                 xs = xs['occ'].to(self.device)
 
-                meshes=model(xs,coords,is_training=False,vis=True)
-
-
-
-
-
-
-                vertices_tensor = torch.as_tensor([
-                    [1, 1, 1],
-                    [-1, -1, 1],
-                    [1, -1, -1],
-                    [-1, 1, -1],
-                ], dtype=torch.float).unsqueeze(0)
-                colors_tensor = torch.as_tensor([
-                    [255, 0, 0],
-                    [0, 255, 0],
-                    [0, 0, 255],
-                    [255, 0, 255],
-                ], dtype=torch.int).unsqueeze(0)
-                faces_tensor = torch.as_tensor([
-                    [0, 2, 3],
-                    [0, 3, 1],
-                    [0, 1, 2],
-                ], dtype=torch.int).unsqueeze(0)
+                vis = True
+                _, meshes, _ = model(xs, coords, is_training=False, vis=vis)
+                self.reconstruct_shape(meshes,epoch,mode=mode)
 
                 #self.writer.add_mesh(mode=mode, tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,
                 #                     faces=faces_tensor)
 
-
-
-                for i in range(len(meshes)):
-                    break
-                    vertices_tensor = torch.as_tensor(meshes[i]['vertices'].copy(), dtype=torch.int).unsqueeze(0)
-                    faces_tensor=torch.as_tensor(meshes[i]['faces'].copy(), dtype=torch.int).unsqueeze(0)
-                    color = np.array([[255, 154, 234]])
-                    color = np.repeat(color, meshes[i]['vertices'].shape[0], axis=0)
-                    colors_tensor = torch.as_tensor(color, dtype=torch.int).unsqueeze(0)
-                    self.writer.add_mesh(mode=mode,tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,faces=faces_tensor)
-
-
-
-
-
+                #for i in range(len(meshes)):
+                #    break
+                #    vertices_tensor = torch.as_tensor(meshes[i]['vertices'].copy(), dtype=torch.int).unsqueeze(0)
+                #    faces_tensor=torch.as_tensor(meshes[i]['faces'].copy(), dtype=torch.int).unsqueeze(0)
+                #   color = np.array([[255, 154, 234]])
+                #    color = np.repeat(color, meshes[i]['vertices'].shape[0], axis=0)
+                #    colors_tensor = torch.as_tensor(color, dtype=torch.int).unsqueeze(0)
+                #    self.writer.add_mesh(mode=mode,tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,faces=faces_tensor)
 
             else:
                 self.reconstruct(summary["xs"], upsample_ratio=3, epoch=epoch, mode=mode)
-
-
-
 
 
         self.writer.add_scalar("loss/loss_total", summary["loss_total"], mode, epoch)

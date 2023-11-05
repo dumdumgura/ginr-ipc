@@ -96,20 +96,24 @@ class TrainerTemplate:
             #self.sampler_trn.set_epoch(i)
             torch.cuda.empty_cache()
             summary_trn = self.train(optimizer, scheduler, scaler, epoch=i)
+
+
             if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
                 torch.cuda.empty_cache()
-                summary_val = self.eval(epoch=i)
-                if self.model_ema is not None:
-                    summary_val_ema = self.eval(ema=True, epoch=i)
+                if self.config.type != 'overfit':
+                    summary_val = self.eval(epoch=i)
+                    if self.model_ema is not None:
+                        summary_val_ema = self.eval(ema=True, epoch=i)
 
             if self.distenv.master:
                 self.logging(summary_trn, scheduler=scheduler, epoch=i + 1, mode="train")
 
-                if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
-                    self.logging(summary_val, scheduler=scheduler, epoch=i + 1, mode="valid")
+                if self.config.type != 'overfit':
+                    if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
+                        self.logging(summary_val, scheduler=scheduler, epoch=i + 1, mode="valid")
 
-                    if self.model_ema is not None:
-                        self.logging(summary_val_ema, scheduler=scheduler, epoch=i + 1, mode="valid_ema")
+                        if self.model_ema is not None:
+                            self.logging(summary_val_ema, scheduler=scheduler, epoch=i + 1, mode="valid_ema")
 
                 if (i + 1) % self.config.experiment.save_ckpt_freq == 0:
                     self.save_ckpt(optimizer, scheduler, i + 1)

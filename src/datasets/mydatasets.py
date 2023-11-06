@@ -52,14 +52,14 @@ class Pointcloud(Dataset):
             pc_path
         )
         self.coords = point_cloud[:, :3]
-        self.occupancies = point_cloud[:, 3]
+        self.occupancies = point_cloud[:, 3].reshape(-1,1)
 
     def __len__(self):
         return self.coords.shape[0]
 
     def __getitem__(self, idx):
-        coords = self.coords[:,:3]
-        occs = self.occupancies[:,3]
+        coords = self.coords[idx]
+        occs = self.occupancies[idx]
         return  {"coords": torch.from_numpy(coords).float(),
             "occ": torch.from_numpy(occs)
         }

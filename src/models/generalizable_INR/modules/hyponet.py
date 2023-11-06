@@ -179,7 +179,7 @@ class HypoNet(nn.Module):
 
         batch_size, coord_shape, input_dim = coord.shape[0], coord.shape[1:-1], coord.shape[-1]
 
-        coord = coord.view(batch_size, -1, input_dim)  # flatten the coordinates
+        coord = coord.view(batch_size, input_dim)  # flatten the coordinates
 
 
         if self.ff_config.type=='3d':
@@ -190,37 +190,37 @@ class HypoNet(nn.Module):
 
         for idx in range(self.config.n_layer):
             param_key = f"linear_wb{idx}"
-            #base_param = einops.repeat(self.params_dict[param_key], "n m -> b n m", b=batch_size)
+            base_param = self.params_dict[param_key]
 
             if (modulation_params_dict is not None) and (param_key in modulation_params_dict.keys()):
                 modulation_param = modulation_params_dict[param_key]
             else:
                 if self.config.use_bias:
-                    modulation_param = torch.ones_like(base_param[:, :-1])
+                    modulation_param = 1
                 else:
-                    modulation_param = torch.ones_like(base_param)
+                    modulation_param = 1
 
             if self.config.use_bias:
                 ones = torch.ones(*hidden.shape[:-1], 1, device=hidden.device)
                 hidden = torch.cat([hidden, ones], dim=-1)
 
-                base_param_w, base_param_b = base_param[:, :-1, :], base_param[:, -1:, :]
+                base_param_w, base_param_b = base_param[:-1, :], base_param[-1:, :]
 
                 if self.ignore_base_param_dict[param_key]:
                     base_param_w = 1.
                 param_w = base_param_w * modulation_param
                 if self.normalize_weight:
-                    param_w = F.normalize(param_w, dim=1)
-                modulated_param = torch.cat([param_w, base_param_b], dim=1)
+                    param_w = F.normalize(param_w, dim=0)
+                modulated_param = torch.cat([param_w, base_param_b], dim=0)
             else:
                 if self.ignore_base_param_dict[param_key]:
                     base_param = 1.
                 if self.normalize_weight:
-                    modulated_param = F.normalize(base_param * modulation_param, dim=1)
+                    modulated_param = F.normalize(base_param * modulation_param, dim=0)
                 else:
-                    modulated_param = base_param * modulation_param
+                    modulated_param = torch.matmul(base_param,  modulation_param)
 
-            hidden = hidden * modulated_param
+            hidden = torch.matmul(hidden,  modulated_param)
             #print(modulated_param.norm())
 
             if idx < (self.config.n_layer - 1):

@@ -56,14 +56,14 @@ loss:
 
 optimizer:
   type: adam
-  init_lr: 0.0001
-  weight_decay: 0.1
+  init_lr: 0.00005
+  weight_decay: 0.001
   betas: [0.9, 0.95] #[0.9, 0.95]
   warmup:
     epoch: 0
     multiplier: 1
     buffer_epoch: 0
-    min_lr: 0.00000001
+    min_lr: 0.000000001
     mode: fix
     start_from_zero: True
   max_gn: null
@@ -72,9 +72,9 @@ experiment:
   amp: True
   batch_size: 4
   total_batch_size: 4
-  epochs: 500
-  epochs_cos: 300
-  save_ckpt_freq: 100
+  epochs: 300
+  epochs_cos: 250
+  save_ckpt_freq: 50
   test_freq: 1
-  test_imlog_freq: 10
+  test_imlog_freq: 50
 

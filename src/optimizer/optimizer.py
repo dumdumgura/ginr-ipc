@@ -16,7 +16,7 @@ def create_inr_optimizer(model, config):
         )
     elif optimizer_type =='overfit':
         optimizer = torch.optim.SGD(
-            model.parameters(), lr=config.init_lr, weight_decay=config.weight_decay, momentum=0.9
+            model.factors.init_modulation_factors.parameters(), lr=config.init_lr, weight_decay=config.weight_decay, momentum=0.9
         )
 
     else:

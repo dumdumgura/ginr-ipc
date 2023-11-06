@@ -86,8 +86,7 @@ class Trainer(TrainerTemplate):
 
             vis = False
             if self.config.dataset.type == 'shapenet':
-                vis = True
-                outputs, meshes, collated_history = model(xs, coord_inputs, is_training=False,vis=vis)
+                outputs, _, collated_history = model(xs, coord_inputs, is_training=False,vis=vis)
                 #self.reconstruct_shape(meshes,epoch,it)
             else:
                 outputs, _, collated_history = model(xs, coord_inputs, is_training=False, vis=vis)
@@ -152,8 +151,8 @@ class Trainer(TrainerTemplate):
             #coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
             #coord_inputs = model.sample_coord_input(xs, device=xs.device)
             #prediction
-            if self.config.type is not None and self.config.type == 'overfit':
-                outputs = model.overfit_one_shape(xs, coord=coord_inputs, is_training=True)
+            if  self.config.type == 'overfit':
+                outputs = model.overfit_one_shape(xs, coord=coord_inputs)
             else:
                 outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True)
 
@@ -200,15 +199,25 @@ class Trainer(TrainerTemplate):
         if epoch % 100 == 1 or epoch % self.config.experiment.test_imlog_freq == 0:
             #self.reconloggingstruct(summary["xs"], upsample_ratio=1, epoch=epoch, mode=mode)
             if self.config.dataset.type == 'shapenet':
-                model = self.model
-                model.eval()
-                xs = summary["xs"]
-                coords = xs['coords'].to(self.device)
-                xs = xs['occ'].to(self.device)
+                if self.config.type !='overfit':
+                    model = self.model
+                    model.eval()
+                    xs = summary["xs"]
+                    coords = xs['coords'].to(self.device)
+                    xs = xs['occ'].to(self.device)
 
-                vis = True
-                _, meshes, _ = model(xs, coords, is_training=False, vis=vis)
-                self.reconstruct_shape(meshes,epoch,mode=mode)
+                    vis = True
+                    _, meshes, _ = model(xs, coords, is_training=False, vis=vis)
+                    self.reconstruct_shape(meshes,epoch,mode=mode)
+                else:
+                    model = self.model
+                    model.eval()
+                    xs = summary["xs"]
+                    coords = xs['coords'].to(self.device)
+                    xs = xs['occ'].to(self.device)
+                    vis = True
+                    meshes = model.overfit_one_shape(xs, coord=coords,vis=vis)
+                    self.reconstruct_shape(meshes,epoch,mode=mode)
 
                 #self.writer.add_mesh(mode=mode, tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,
                 #                     faces=faces_tensor)

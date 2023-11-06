@@ -148,9 +148,13 @@ def create_meshes(
     scale=None,
     level=0,
     time_val=-1,
+    overfit=False
 ):
     #especailly for hyponet visualization
-    batch = modulation_params_dict['linear_wb1'].shape[0]
+    if overfit:
+        batch = 1
+    else:
+        batch = modulation_params_dict['linear_wb1'].shape[0]
 
     start = time.time()
     ply_filename = filename
@@ -179,31 +183,39 @@ def create_meshes(
 
     num_samples = N**3
 
-    samples= np.repeat(samples[np.newaxis,:,:],batch,axis=0)
-
+    if not overfit:
+        samples = np.repeat(samples[np.newaxis, :, :], batch, axis=0)
     samples.requires_grad = False
 
     head = 0
 
     while head < num_samples:
         # print(head)
-        sample_subset = samples[:,head : min(head + max_batch, num_samples), 0:3].cuda()
-        if time_val >= 0:
-            sample_subset = torch.hstack(
-                (
-                    sample_subset,
-                    torch.ones((sample_subset.shape[0], 1)).cuda() * time_val,
-                )
+        if overfit:
+            sample_subset = samples[head : min(head + max_batch, num_samples), 0:3].cuda()
+        else:
+            sample_subset = samples[:,head: min(head + max_batch, num_samples), 0:3].cuda()
+
+
+        if overfit:
+            samples[head: min(head + max_batch, num_samples), 3] = (
+                decoder.forward_overfit(sample_subset, modulation_params_dict=modulation_params_dict).squeeze().detach().cpu()
+            # .squeeze(1)
             )
-        samples[:,head : min(head + max_batch, num_samples), 3] = (
-            decoder(sample_subset,modulation_params_dict=modulation_params_dict).squeeze().detach().cpu()  # .squeeze(1)
-        )
+        else:
+            samples[:,head : min(head + max_batch, num_samples), 3] = (
+                decoder(sample_subset,modulation_params_dict=modulation_params_dict).squeeze().detach().cpu()  # .squeeze(1)
+            )
         head += max_batch
 
     meshes=[]
     tmp = {}
+
     for i in range(batch):
-        sdf_values = samples[i,:, 3]
+        if overfit:
+            sdf_values = samples[:, 3]
+        else:
+            sdf_values = samples[i,:, 3]
         sdf_values = sdf_values.reshape(N, N, N)
         tmp['vertices'], tmp['faces'],_ = convert_sdf_samples_to_ply(
             sdf_values.data.cpu(),

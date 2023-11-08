@@ -17,3 +17,5 @@ plyfile
 scikit-image
 datadings
 trimesh
+plyfile==0.9
+scikit-image==0.18.1

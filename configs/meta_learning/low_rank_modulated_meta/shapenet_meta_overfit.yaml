@@ -2,7 +2,7 @@ type: overfit
 trainer: stage_inr
 dataset:
   type: shapenet
-  folder: /home/umaru/praktikum/changed_version/HyperDiffusion/data/02691156_manifold_300000_pc_occ_in_out_True/1dbcb49dfbfd0844a480511cbe2c4655.obj.npy
+  folder: /home/umaru/praktikum/changed_version/ginr-ipc/data/test_data/shape.npy
   transforms:
     type: shapenet
 
@@ -11,7 +11,7 @@ arch: # needs to add encoder, modulation type
   ema: null
 
   rank: [128] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
-  modulated_layer_idxs: [1]
+  modulated_layer_idxs: [1,3]
   use_factorization: true
 
   n_inner_step: 4
@@ -36,8 +36,8 @@ arch: # needs to add encoder, modulation type
       type: 3d
       trainable: false
       use_ff: true
-      ff_sigma: 4 # ff_dim = 2*ff_sigma *3 + (3)
-      ff_dim: 27
+      ff_sigma: 5 # ff_dim = 2*ff_sigma *3 + (3)
+      ff_dim: 33
 
     activation:
       type: relu
@@ -55,16 +55,23 @@ loss:
   coord_noise: null
 
 optimizer:
-  type: overfit
-  init_lr: 0.00001
-  weight_decay: 0.00001
+  type: adam
+  init_lr: 0.0001
+  weight_decay: 0.5
+
   betas: [0.9, 0.95] #[0.9, 0.95]
   warmup:
     epoch: 0
     multiplier: 1
     buffer_epoch: 0
-    min_lr: 0.000000001
+    min_lr: 0.0001
     mode: fix
+    step_size: 30
+    gamma: 0.1
+    patience: 30
+    patience_adaptive: 3200
+    factor: 0.8
+    threshold: 0
     start_from_zero: True
   max_gn: null
 
@@ -72,9 +79,9 @@ experiment:
   amp: True
   batch_size: 500
   total_batch_size: 500
-  epochs: 50
+  epochs: 30
   epochs_cos: 30
-  save_ckpt_freq: 20
-  test_freq: 20
-  test_imlog_freq: 10
+  save_ckpt_freq: 10
+  test_freq: 30
+  test_imlog_freq: 30
 

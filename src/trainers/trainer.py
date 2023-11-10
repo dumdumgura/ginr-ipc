@@ -59,7 +59,7 @@ class TrainerTemplate:
             shuffle=True,
             pin_memory=True,
             batch_size=config.experiment.batch_size,
-            #num_workers=num_workers,
+            num_workers=num_workers,
         )
 
         #self.sampler_val = torch.utils.data.distributed.DistributedSampler(
@@ -72,7 +72,7 @@ class TrainerTemplate:
             shuffle=True,
             pin_memory=True,
             batch_size=config.experiment.batch_size,
-            #num_workers=num_workers,
+            num_workers=num_workers,
         )
 
         self._scaler = None

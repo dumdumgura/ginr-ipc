@@ -129,6 +129,7 @@ class HypoNet(nn.Module):
 
         elif ff_type == "random_gaussian":
             self.ff_linear = torch.randn(self.config.input_dim, ff_dim) * ff_sigma  # scaler
+
         elif ff_type == "deterministic_transinr_nerf":
             self.ff_linear = 2 ** torch.linspace(0, ff_sigma, self.ff_dim // self.config.input_dim)
         else:

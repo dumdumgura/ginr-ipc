@@ -21,9 +21,12 @@ def default_parser():
     #parser.add_argument("-m", "--model-config", type=str,  default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
     parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta_overfit.yaml")
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/")
-    parser.add_argument("-t", "--task", type=str, default="lerp7")
-    parser.add_argument("-l1", "--load-path_1", type=str, default="./results.tmp/shapenet_meta_overfit/overfit_3d_b30/epoch20_model.pt")
-    parser.add_argument("-l2", "--load-path_2", type=str, default="./results.tmp/shapenet_meta_overfit/overfit_3f_bd82a/epoch20_model.pt")
+    parser.add_argument("-t", "--task", type=str, default="lerp_new_13")
+    parser.add_argument("-l1", "--load-path_1", type=str, default="./results.tmp/shapenet_meta_overfit/overfit_5_ml13_f128_5/epoch10_model.pt")
+    parser.add_argument("-l2", "--load-path_2", type=str, default="./results.tmp/shapenet_meta_overfit/overfit_5_ml13_f128_1/epoch10_model.pt")
+
+    parser.add_argument("-l3", "--load-path_3", type=str,
+                        default="./results.tmp/shapenet_meta_overfit/overfit_5_ml13_f128_3/epoch10_model.pt")
 
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)
@@ -97,10 +100,7 @@ if __name__ == "__main__":
 
 
     model_1, model_ema_1 = create_model(config.arch, ema=config.arch.ema is not None)
-    model_2, model_ema_2 = create_model(config.arch, ema=config.arch.ema is not None)
-    model_1 = model_1.to(device)
-    model_2 = model_2.to(device)
-
+    model_1.to(device)
 
     # Checkpoint loading
     if not args.load_path_1 == "":
@@ -109,26 +109,76 @@ if __name__ == "__main__":
 
     if not args.load_path_2 == "":
         ckpt_2 = torch.load(args.load_path_2, map_location="cpu")
-        print(ckpt_2)
+        #print(ckpt_2)
+    if not args.load_path_3 == "":
+        ckpt_3 = torch.load(args.load_path_3, map_location="cpu")
+
+    weight_11 = ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb1']
+    weight_21 = ckpt_2['state_dict']['factors.init_modulation_factors.linear_wb1']
+    weight_31 = ckpt_3['state_dict']['factors.init_modulation_factors.linear_wb1']
+
+    weight_12 = ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb3']
+    weight_22 = ckpt_2['state_dict']['factors.init_modulation_factors.linear_wb3']
+    weight_32 = ckpt_3['state_dict']['factors.init_modulation_factors.linear_wb3']
 
 
-    weight_1 = ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb1']
-    weight_2 = ckpt_2['state_dict']['factors.init_modulation_factors.linear_wb1']
-
-    num_steps = 11
+    num_steps = 30
     alphas = np.linspace(0, 1, num_steps)
     meshes=[]
     #interpolated_weights_list = []
     for alpha in alphas:
-        interpolated_weights = alpha * weight_1 + (1 - alpha) * weight_2
+        break
+        interpolated_weights_1 = alpha * weight_11 + (1 - alpha) * weight_21
+        interpolated_weights_2 = alpha * weight_12 + (1 - alpha) * weight_22
         #interpolated_weights_list.append(interpolated_weights)
-        ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb1'] = interpolated_weights
+        ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb1'] = interpolated_weights_1
+        ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb3'] = interpolated_weights_2
         model_1.load_state_dict(ckpt_1["state_dict"], strict=False)
+        model_1.to(device)
         xs=1
         coords=3
         mesh = model_1.overfit_one_shape(xs,coords,vis=True)
         reconstruct_shape(mesh,alpha)
     # dist.barrier()
+
+    def generate_point_in_triangle():
+        # Generate random barycentric coordinates
+        r1, r2 = torch.rand(2)
+        sqrt_r1 = torch.sqrt(r1)
+
+        # Calculate barycentric coordinates
+        alpha = 1.0 - sqrt_r1
+        beta = sqrt_r1 * (1.0 - r2)
+        gamma = 1.0 - alpha - beta
+
+        # Calculate the point inside the triangle
+        #point = alpha * vertices[0] + beta * vertices[1] + gamma * vertices[2]
+
+        return alpha,beta,gamma
+
+    # High-dimensional triangle vertices (3D for simplicity in this example)
+    vertices1= []
+    vertices1.append(weight_11)
+    vertices1.append(weight_21)
+    vertices1.append(weight_31)
+
+    vertices2= []
+    vertices2.append(weight_12)
+    vertices2.append(weight_22)
+    vertices2.append(weight_32)
+    for i in range(10):
+    # Generate a point inside the triangle
+        alpha,beta,gamma= generate_point_in_triangle()
+        interpolated_weights_1= alpha * vertices1[0] + beta * vertices1[1] + gamma * vertices1[2]
+        interpolated_weights_2 = alpha * vertices2[0] + beta * vertices2[1] + gamma * vertices2[2]
+        ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb1'] = interpolated_weights_1
+        ckpt_1['state_dict']['factors.init_modulation_factors.linear_wb3'] = interpolated_weights_2
+
+        model_1.load_state_dict(ckpt_1["state_dict"], strict=False)
+        xs = 1
+        coords = 3
+        mesh = model_1.overfit_one_shape(xs, coords, vis=True)
+        reconstruct_shape(mesh, alpha)
 
     if distenv.master:
         writer.close()

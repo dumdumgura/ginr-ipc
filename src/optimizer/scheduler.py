@@ -1,6 +1,6 @@
 import math
 import torch
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 
 
 def create_scheduler(optimizer, config, steps_per_epoch, max_epoch, distenv=None):
@@ -14,6 +14,15 @@ def create_scheduler(optimizer, config, steps_per_epoch, max_epoch, distenv=None
     start_from_zero = config.start_from_zero
 
     scheduler = CosineAnnealingLR(optimizer, T_max=(final_steps - warmup_steps - buffer_steps), eta_min=min_lr)
+    if mode == 'adaptive':
+        scheduler = ReduceLROnPlateau(
+            optimizer,
+            patience=config.patience_adaptive,
+            factor= config.factor,
+            verbose=True,
+            threshold=config.threshold,
+            min_lr=config.min_lr,
+        )
 
     if warmup_steps > 0.0:
         if mode == "linear":
@@ -36,7 +45,7 @@ def create_scheduler(optimizer, config, steps_per_epoch, max_epoch, distenv=None
     else:
         warmup = None
 
-    scheduler = Scheduler(warmup_scheduler=warmup, after_scheduler=scheduler)
+    scheduler = Scheduler(warmup_scheduler=warmup, after_scheduler=scheduler,mode=mode)
 
     return scheduler
 
@@ -62,22 +71,29 @@ class GradualWarmup(torch.optim.lr_scheduler._LRScheduler):
 
 
 class Scheduler:
-    def __init__(self, warmup_scheduler, after_scheduler):
+    def __init__(self, warmup_scheduler, after_scheduler,mode):
         self.warmup_scheduler = warmup_scheduler
         self.after_scheduler = after_scheduler
+        self.mode = mode
 
-    def step(self, epoch=None):
+    def step(self, metrics=None,epoch=None):
         if self.warmup_scheduler is not None:
             self.warmup_scheduler.step(epoch=epoch)
 
         if self.warmup_scheduler is None or self.warmup_scheduler.last_epoch > self.warmup_scheduler.t_steps:
-            self.after_scheduler.step(epoch=epoch)
+            if self.mode =='adaptive':
+                self.after_scheduler.step(metrics=metrics)
+            else:
+                self.after_scheduler.step(epoch=epoch)
 
     def get_last_lr(self):
         if self.warmup_scheduler is not None and self.warmup_scheduler.last_epoch <= self.warmup_scheduler.t_steps:
             return self.warmup_scheduler.get_last_lr()
         else:
-            return self.after_scheduler.get_last_lr()
+            if self.mode == 'adaptive':
+                return self.after_scheduler._last_lr
+            else:
+                return self.after_scheduler.get_last_lr()
 
     def state_dict(self):
         return {

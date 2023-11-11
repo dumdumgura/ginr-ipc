@@ -70,8 +70,8 @@ optimizer:
 
 experiment:
   amp: True
-  batch_size: 4
-  total_batch_size: 4
+  batch_size: 8
+  total_batch_size: 96
   epochs: 300
   epochs_cos: 250
   save_ckpt_freq: 50

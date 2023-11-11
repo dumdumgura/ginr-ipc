@@ -2,7 +2,7 @@ type: overfit
 trainer: stage_inr
 dataset:
   type: shapenet
-  folder: /home/umaru/praktikum/changed_version/HyperDiffusion/data/02691156_manifold_300000_pc_occ_in_out_True/1dbcb49dfbfd0844a480511cbe2c4655.obj.npy
+  folder: data/shapenet/single_fit/3e0561d70c7fd4f51c6e4e20f2b76086.obj.npy
   transforms:
     type: shapenet
 
@@ -70,9 +70,9 @@ optimizer:
 
 experiment:
   amp: True
-  batch_size: 500
-  total_batch_size: 500
-  epochs: 50
+  batch_size: 2000
+  total_batch_size: 2000
+  epochs: 300
   epochs_cos: 30
   save_ckpt_freq: 20
   test_freq: 20

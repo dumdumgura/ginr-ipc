@@ -5,6 +5,7 @@ import torch
 import torchvision
 from tqdm import tqdm
 import plyfile
+import os
 
 from utils.accumulator import AccmStageINR
 from .trainer import TrainerTemplate
@@ -29,7 +30,7 @@ class Trainer(TrainerTemplate):
 
     @torch.no_grad()
 
-    def reconstruct_shape(self,meshes,epoch,it=1,mode='train'):
+    def reconstruct_shape(self, meshes, epoch, path, it=1, mode='train'):
         for k in range(len(meshes)):
             # try writing to the ply file
             verts = meshes[k]['vertices']
@@ -58,7 +59,9 @@ class Trainer(TrainerTemplate):
 
             ply_data = plyfile.PlyData([el_verts, el_faces])
             # logging.debug("saving mesh to %s" % (ply_filename_out))
-            ply_data.write("./results.tmp/ply/" + str(epoch) + "_" +str(mode)+"_"+ str(it*len(meshes)+k) + "_poly.ply")
+            if not os.path.exists(os.path.join(path, "ply")):
+                os.makedirs(os.path.join(path, "ply"))
+            ply_data.write(os.path.join(path, "ply", (str(epoch) + "_" +str(mode)+"_"+ str(it*len(meshes)+k) + "_poly.ply")))
 
     def eval(self, valid=True, ema=False, verbose=False, epoch=0):
         model = self.model_ema if ema else self.model
@@ -208,7 +211,7 @@ class Trainer(TrainerTemplate):
 
                     vis = True
                     _, meshes, _ = model(xs, coords, is_training=False, vis=vis)
-                    self.reconstruct_shape(meshes,epoch,mode=mode)
+                    self.reconstruct_shape(meshes, epoch, self.writer.result_path, mode=mode)
                 else:
                     model = self.model
                     model.eval()
@@ -217,7 +220,7 @@ class Trainer(TrainerTemplate):
                     xs = xs['occ'].to(self.device)
                     vis = True
                     meshes = model.overfit_one_shape(xs, coord=coords,vis=vis)
-                    self.reconstruct_shape(meshes,epoch,mode=mode)
+                    self.reconstruct_shape(meshes, epoch, self.writer.result_path, mode=mode)
 
                 #self.writer.add_mesh(mode=mode, tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,
                 #                     faces=faces_tensor)

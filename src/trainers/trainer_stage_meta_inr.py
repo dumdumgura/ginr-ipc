@@ -142,7 +142,7 @@ class Trainer(TrainerTemplate):
             model.zero_grad(set_to_none=True)
             #xs = xs.to(self.device, non_blocking=True)
 
-            if self.config.dataset.type == "shapenet":
+            if "shapenet" in self.config.dataset.type :
                 coord_inputs = xt['coords'].to(self.device)
                 xs = xt['occ'].to(self.device)
             else:
@@ -191,7 +191,6 @@ class Trainer(TrainerTemplate):
                 line += accm.get_summary().print_line()
                 line += f""", lr: {scheduler.get_last_lr()[0]:e}"""
                 pbar.set_description(line)
-
         summary = accm.get_summary()
         summary["xs"] = xt
         return summary
@@ -199,7 +198,7 @@ class Trainer(TrainerTemplate):
     def logging(self, summary, scheduler=None, epoch=0, mode="train"):
         if epoch % 100 == 1 or epoch % self.config.experiment.test_imlog_freq == 0:
             #self.reconloggingstruct(summary["xs"], upsample_ratio=1, epoch=epoch, mode=mode)
-            if self.config.dataset.type == 'shapenet':
+            if 'shapenet' in self.config.dataset.type:
                 model = self.model
                 model.eval()
                 xs = summary["xs"]

@@ -100,7 +100,11 @@ class TrainerTemplate:
 
             if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
                 torch.cuda.empty_cache()
+<<<<<<< Updated upstream
                 if self.config.type != 'overfit':
+=======
+                if self.config.experiment.eval:
+>>>>>>> Stashed changes
                     summary_val = self.eval(epoch=i)
                     if self.model_ema is not None:
                         summary_val_ema = self.eval(ema=True, epoch=i)
@@ -108,8 +112,13 @@ class TrainerTemplate:
             if self.distenv.master:
                 self.logging(summary_trn, scheduler=scheduler, epoch=i + 1, mode="train")
 
+<<<<<<< Updated upstream
                 if self.config.type != 'overfit':
                     if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
+=======
+                if i == 0 or (i + 1) % self.config.experiment.test_freq == 0:
+                    if self.config.experiment.eval:
+>>>>>>> Stashed changes
                         self.logging(summary_val, scheduler=scheduler, epoch=i + 1, mode="valid")
 
                         if self.model_ema is not None:

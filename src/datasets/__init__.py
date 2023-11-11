@@ -2,7 +2,11 @@ import os
 
 import torch
 
+<<<<<<< Updated upstream
 from .mydatasets import ImageNette, FFHQ, ImageOnlyDataset, LearnitShapenet, LibriSpeech, Celeba, ShapeNet,Pointcloud
+=======
+from .mydatasets import ImageNette, FFHQ, ImageOnlyDataset, LearnitShapenet, LibriSpeech, Celeba, ShapeNet, ShapeNetSingleFit
+>>>>>>> Stashed changes
 from .transforms import create_transforms
 
 SMOKE_TEST = bool(os.environ.get("SMOKE_TEST", 0))
@@ -14,6 +18,7 @@ def create_dataset(config, is_eval=False, logger=None):
 
 
     if config.dataset.type =="shapenet":
+<<<<<<< Updated upstream
         if config.type == 'overfit':
             dataset_trn = Pointcloud(config.dataset.folder, split="train")
             dataset_val = Pointcloud(config.dataset.folder, split="val")
@@ -21,6 +26,16 @@ def create_dataset(config, is_eval=False, logger=None):
             dataset_trn = ShapeNet(config.dataset.folder, split="train")
             dataset_val = ShapeNet(config.dataset.folder, split="val")
 
+=======
+        dataset_trn = ShapeNet(config.dataset.folder, split="train")
+        dataset_val = ShapeNet(config.dataset.folder, split="val")
+        
+    elif config.dataset.type =="shapenet_singlefit":
+        dataset_trn = ShapeNetSingleFit(config.dataset.file_path)
+        logger.info(f"#point samples: {len(dataset_trn)}")
+        
+        return dataset_trn, None
+>>>>>>> Stashed changes
     elif config.dataset.type == "imagenette":
         dataset_trn = ImageNette(split="train", transform=transforms_trn)
         dataset_val = ImageNette(split="val", transform=transforms_val)
@@ -40,7 +55,7 @@ def create_dataset(config, is_eval=False, logger=None):
     else:
         raise ValueError("%s not supported..." % config.dataset.type)
 
-    if config.get("trainer", "") == "stage_inr" and config.dataset.type != 'shapenet':
+    if config.get("trainer", "") == "stage_inr" and 'shapenet' not in config.dataset.type:
         dataset_trn = ImageOnlyDataset(dataset_trn)
         dataset_val = ImageOnlyDataset(dataset_val)
 

@@ -198,7 +198,7 @@ class MetaLowRankModulatedINR(TransINR):
         # predict all pixels of coord after applying the modulation_parms into hyponet
 
         meshes=create_meshes(
-            self.hyponet,modulation_params_dict,level=0.0, N=128
+            self.hyponet,modulation_params_dict,level=0.0, N=64
         )
         return meshes
 
@@ -337,6 +337,7 @@ class MetaLowRankModulatedINR(TransINR):
         else:
             return outputs, modulation_factors_dict, collated_history
 
+<<<<<<< Updated upstream
     def overfit_one_shape(self, coord, xs, modulation_factors_dict):
 
 
@@ -352,3 +353,17 @@ class MetaLowRankModulatedINR(TransINR):
 
         return outputs
 
+=======
+class MetaLowRankModulatedINR_SingleFit(MetaLowRankModulatedINR):
+    Config = MetaLowRankModulatedINRConfig
+
+    def __init__(self, config: MetaLowRankModulatedINRConfig):
+        super(MetaLowRankModulatedINR, self).__init__()
+        self.modulation_factors = super().factors
+        
+    def inner_loop(self, xs, coord=None, n_inner_step=1, inner_lr=0.1, is_training=True):
+        modulation_factors_dict, inner_loop_history = super().inner_loop()
+        self.factors.init_modulation_factors = modulation_factors_dict
+
+        return modulation_factors_dict, inner_loop_history
+>>>>>>> Stashed changes

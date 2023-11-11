@@ -143,7 +143,7 @@ def create_meshes(
     modulation_params_dict,
     filename=None,
     N=256,
-    max_batch=10**4,
+    max_batch=10**3,
     offset=None,
     scale=None,
     level=0,

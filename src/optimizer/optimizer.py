@@ -2,6 +2,16 @@ import torch
 
 def create_inr_optimizer(model, config):
     optimizer_type = config.type.lower()
+    
+    #if overfit to single
+    #edit params to feed to optimizer
+    if config.single_overfit:
+        # freeze all layers
+        for param in model.parameters():
+            param.requires_grad = False
+        # except modulation params
+        model.factors.init_modulation_factors.linear_wb1.requires_grad = True
+    
     if optimizer_type == "adamw":
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=config.init_lr, weight_decay=config.weight_decay, betas=config.betas

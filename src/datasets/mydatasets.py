@@ -42,6 +42,7 @@ class ShapeNet(Dataset):
             "occ": torch.from_numpy(occs)
         }
 
+<<<<<<< Updated upstream
 class Pointcloud(Dataset):
     def __init__(
         self,
@@ -64,6 +65,26 @@ class Pointcloud(Dataset):
             "occ": torch.from_numpy(occs)
         }
 
+=======
+class ShapeNetSingleFit(Dataset):
+    def __init__(
+        self,
+        file_path
+    ):
+        
+        self.file_path = file_path
+        self.point_cloud = np.load(self.file_path, allow_pickle=True)
+        
+    def __len__(self):
+        return self.point_cloud.shape[0]
+    
+    def __getitem__(self, idx):
+            coords = self.point_cloud[idx,:3]
+            occs = self.point_cloud[idx,3:]
+            return  {"coords": torch.from_numpy(coords).float(),
+                "occ": torch.from_numpy(occs)
+        }
+>>>>>>> Stashed changes
 
 class ImageNette(Dataset):
     """Dataset for ImageNette that contains 10 classes of ImageNet.

@@ -1,8 +1,9 @@
 type: generalize
 trainer: stage_inr
 dataset:
-  type: shapenet
+  type: shapenet_singlefit
   folder: ./data/shapenet
+  file_path: ./data/shapenet/single_fit/3e0561d70c7fd4f51c6e4e20f2b76086.obj.npy
   transforms:
     type: shapenet
 
@@ -67,9 +68,11 @@ optimizer:
     mode: fix
     start_from_zero: True
   max_gn: null
+  single_overfit: True
 
 experiment:
   amp: True
+<<<<<<< Updated upstream
   batch_size: 4
   total_batch_size: 4
   epochs: 500
@@ -77,4 +80,14 @@ experiment:
   save_ckpt_freq: 100
   test_freq: 1
   test_imlog_freq: 10
+=======
+  eval: False
+  batch_size: 256
+  total_batch_size: 256
+  epochs: 100
+  epochs_cos: 50
+  save_ckpt_freq: 2
+  test_freq: 2
+  test_imlog_freq: 300
+>>>>>>> Stashed changes
 

@@ -200,9 +200,15 @@ class MetaLowRankModulatedINR(TransINR):
         meshes = []
         # predict all pixels of coord after applying the modulation_parms into hyponet
 
-        meshes=create_meshes(
-            self.hyponet,modulation_params_dict,level=0.0, N=256,overfit=overfit
-        )
+        #for level in np.linspace(0,0.5,4):
+        #    mesh=create_meshes(
+        #        self.hyponet,modulation_params_dict,level=level, N=256,overfit=overfit
+        #    )
+        #    meshes.extend(mesh)
+        meshes = create_meshes(
+                self.hyponet,modulation_params_dict,level=0, N=256,overfit=overfit
+                )
+
         return meshes
 
 

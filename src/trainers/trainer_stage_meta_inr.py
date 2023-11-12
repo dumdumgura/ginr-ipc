@@ -168,12 +168,18 @@ class Trainer(TrainerTemplate):
                 loss_type = 'ce'
             loss = model.compute_loss(outputs, targets,loss_type)
 
+            epoch_loss =float(loss["loss_total"].item())
 
             loss["loss_total"].backward()
             if self.config.optimizer.max_gn is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), self.config.optimizer.max_gn)
             optimizer.step()
-            scheduler.step()
+
+            if scheduler.mode =='adaptive':
+
+                scheduler.step(epoch_loss)
+            else:
+                scheduler.step(epoch)
 
             if model_ema:
                 model_ema.module.update(model.module, total_step)

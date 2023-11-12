@@ -20,12 +20,21 @@ class ShapeNet(Dataset):
     ):
         self.split = split
         self.data_source = os.path.join(dataset_folder,split)
+        self.filter = os.path.join(dataset_folder,'shape_filter_small.txt')
 
-        files = [
-            file
-            for file in os.listdir(self.data_source)
-            if file not in ["train_split.lst", "test_split.lst", "val_split.lst"]
-        ]
+        files = []
+        filter_list=[]
+        with open(self.filter,"r") as text:
+            for line in text:
+                file_name = line.strip()
+                filter_list.append(file_name+".npy")
+
+
+        for file in os.listdir(self.data_source):
+            if file in filter_list:
+                files.append(file)
+
+
         self.npyfiles = files
 
     def __len__(self):

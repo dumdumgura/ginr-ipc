@@ -1,0 +1,27 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: main_stage_inr_w_load_path",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_stage_inr.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--load-path=./results.tmp/shapenet_meta/09.11.2023_12:32:40_large_train_w_val/epoch300_model.pt",
+            "--model-config=./configs/meta_learning/low_rank_modulated_meta/shapenet_meta_overfit_optim_experiment.yaml"]
+        },
+        {
+            "name": "Python: main_stage_inr_wo_load_path",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_stage_inr.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--model-config=./configs/meta_learning/low_rank_modulated_meta/shapenet_meta_modulation_layer_experiment.yaml"]
+        }
+    ]
+}

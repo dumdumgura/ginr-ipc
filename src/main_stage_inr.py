@@ -23,7 +23,8 @@ def default_parser():
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/")
     parser.add_argument("-t", "--task", type=str, default="large_train_w_val")
     #parser.add_argument("-l", "--load-path", type=str, default="./results.tmp/shapenet_meta/new_train_2/epoch200_model.pt")
-    parser.add_argument("-l", "--load-path", type=str, default="./results.tmp/shapenet_meta/09.11.2023_12:32:40_large_train_w_val/epoch300_model.pt")
+    #parser.add_argument("-l", "--load-path", type=str, default="./results.tmp/shapenet_meta/09.11.2023_12:32:40_large_train_w_val/epoch300_model.pt")
+    parser.add_argument("-l", "--load-path", type=str, default="")
     #parser.add_argument("-l", "--load-path", type=str,default="")
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)
@@ -78,13 +79,13 @@ if __name__ == "__main__":
         if model_ema is not None:
             model_ema.module.load_state_dict(ckpt["state_dict_ema"])
 
-        if distenv.master:
-            logger.info(f"{args.load_path} model is loaded")
+        logger.info(f"{args.load_path} model is loaded")
     else:
         ckpt = None
         if args.eval or args.resume:
             raise ValueError("--load-path must be specified in evaluation or resume mode")
-
+        logger.info(f"No saved model is found")
+        
     # Optimizer definition
     if args.eval:
         optimizer, scheduler, epoch_st = None, None, None

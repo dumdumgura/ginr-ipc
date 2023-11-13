@@ -180,7 +180,7 @@ class HypoNet(nn.Module):
 
         batch_size, coord_shape, input_dim = coord.shape[0], coord.shape[1:-1], coord.shape[-1]
 
-        coord = coord.view(batch_size, input_dim)  # flatten the coordinates
+        coord = coord.view(-1, input_dim)  # flatten the coordinates
 
 
         if self.ff_config.type=='3d':

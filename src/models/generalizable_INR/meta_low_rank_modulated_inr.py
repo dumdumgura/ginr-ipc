@@ -206,7 +206,7 @@ class MetaLowRankModulatedINR(TransINR):
         #    )
         #    meshes.extend(mesh)
         meshes = create_meshes(
-                self.hyponet,modulation_params_dict,level=0, N=256,overfit=overfit
+                self.hyponet,modulation_params_dict,level=0, N=512,overfit=overfit
                 )
 
         return meshes
@@ -235,7 +235,7 @@ class MetaLowRankModulatedINR(TransINR):
                 loss_type = 'mean'
             else:
                 loss_type = 'ce'
-            metrics = self.compute_loss(recons, xs, reduction=loss_type,modulation_list=modulation_factors_list,reg=0.001)
+            metrics = self.compute_loss(recons, xs, reduction=loss_type,modulation_list=modulation_factors_list)
 
             # compute gradient w.r.t. latents
             grads_list = torch.autograd.grad(metrics["loss_total"], modulation_factors_list, create_graph=is_training)

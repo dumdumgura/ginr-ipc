@@ -1,4 +1,5 @@
 import logging
+import time
 
 import numpy as np
 import torch
@@ -20,7 +21,7 @@ class Trainer(TrainerTemplate):
     def get_accm(self):
         n_inner_step = self.config.arch.n_inner_step
         accm = AccmStageINR(
-            scalar_metric_names=("loss_total", "mse", "psnr"),
+            scalar_metric_names=("loss_total", "mse", "psnr","onsurface_loss","spatial_loss"),
             vector_metric_names=("inner_mse", "inner_psnr"),
             vector_metric_lengths=(n_inner_step, n_inner_step),
             device=self.device,
@@ -79,6 +80,8 @@ class Trainer(TrainerTemplate):
             if self.config.dataset.type == "shapenet":
                 coord_inputs = xt['coords'].to(self.device)
                 xs = xt['occ'].to(self.device)
+                labels=xt['label'].to(self.device)
+
             else:
                 xs = xt.to(self.device)
                 coord_inputs = model.sample_coord_input(xs, device=xs.device)
@@ -95,14 +98,19 @@ class Trainer(TrainerTemplate):
             targets = xs.detach()
 
             #loss = model.module.compute_loss(outputs, targets, reduction="sum")
-            loss = model.compute_loss(outputs, targets, reduction="ce")
+            loss = model.compute_loss(outputs, targets, reduction="ce",label=labels)
+
 
             metrics = dict(
                 loss_total=loss["loss_total"],
-                mse=loss["mse"],
-                psnr=loss["psnr"],
-                inner_mse=collated_history["mse"],
-                inner_psnr=collated_history["psnr"],
+                #mse=loss["mse"],
+                #psnr=loss["psnr"],
+
+                onsurface_loss = loss["onsurface_loss"],
+                spatial_loss = loss["spatial_loss"],
+
+                #inner_mse=collated_history["mse"],
+                #inner_psnr=collated_history["psnr"],
             )
             accm.update(metrics, count=xs.shape[0], sync=True, distenv=self.distenv)
 
@@ -124,6 +132,7 @@ class Trainer(TrainerTemplate):
         return summary
 
     def train(self, optimizer=None, scheduler=None, scaler=None, epoch=0):
+        start = time.time()
         model = self.model
         model_ema = self.model_ema
         total_step = len(self.loader_trn) * epoch
@@ -136,14 +145,20 @@ class Trainer(TrainerTemplate):
         else:
             pbar = enumerate(self.loader_trn)
 
+        print()
         model.train()
+        end_2 = time.time()
+        print(end_2 - start)
         for it, xt in pbar:
+            end = time.time()
+            print(end-start)
             model.zero_grad(set_to_none=True)
             #xs = xs.to(self.device, non_blocking=True)
 
             if self.config.dataset.type == "shapenet":
                 coord_inputs = xt['coords'].to(self.device)
                 xs = xt['occ'].to(self.device)
+                labels=xt['label'].to(self.device)
             else:
                 xs = xt.to(self.device)
                 coord_inputs = model.sample_coord_input(xs, device=xs.device)
@@ -151,6 +166,8 @@ class Trainer(TrainerTemplate):
             #coord_inputs = model.module.sample_coord_input(xs, device=xs.device)
             #coord_inputs = model.sample_coord_input(xs, device=xs.device)
             #prediction
+
+
             if  self.config.type == 'overfit':
                 outputs = model.overfit_one_shape(xs, coord=coord_inputs)
             else:
@@ -161,9 +178,12 @@ class Trainer(TrainerTemplate):
 
             if self.config.arch.hyponet.fourier_mapping in ['deterministic_transinr']:
                 loss_type = 'mean'
+                label = None
             else:
                 loss_type = 'ce'
-            loss = model.compute_loss(outputs, targets,loss_type)
+                label = labels
+
+            loss = model.compute_loss(outputs, targets,reduction=loss_type,label=labels)
 
             epoch_loss =float(loss["loss_total"].item())
 
@@ -183,8 +203,11 @@ class Trainer(TrainerTemplate):
 
             metrics = dict(
                 loss_total=loss["loss_total"],
-                mse=loss["mse"],
-                psnr=loss["psnr"],
+                #mse=loss["mse"],
+                #psnr=loss["psnr"],
+                onsurface_loss=loss["onsurface_loss"],
+                spatial_loss=loss["spatial_loss"],
+
                 #inner_mse=collated_history["mse"] / xs.shape[0],
                 #inner_psnr=collated_history["psnr"] / xs.shape[0],
             )
@@ -196,6 +219,8 @@ class Trainer(TrainerTemplate):
                 line += accm.get_summary().print_line()
                 line += f""", lr: {scheduler.get_last_lr()[0]:e}"""
                 pbar.set_description(line)
+
+
 
         summary = accm.get_summary()
         summary["xs"] = xt
@@ -242,8 +267,10 @@ class Trainer(TrainerTemplate):
 
 
         self.writer.add_scalar("loss/loss_total", summary["loss_total"], mode, epoch)
-        self.writer.add_scalar("loss/mse", summary["mse"], mode, epoch)
-        self.writer.add_scalar("loss/psnr", summary["psnr"], mode, epoch)
+        self.writer.add_scalar("loss/onsurface_loss", summary["onsurface_loss"], mode, epoch)
+        self.writer.add_scalar("loss/spatial_loss", summary["spatial_loss"], mode, epoch)
+        #self.writer.add_scalar("loss/mse", summary["mse"], mode, epoch)
+        #self.writer.add_scalar("loss/psnr", summary["psnr"], mode, epoch)
 
         if mode == "train":
             self.writer.add_scalar("lr", scheduler.get_last_lr()[0], mode, epoch)

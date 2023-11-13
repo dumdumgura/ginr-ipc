@@ -27,7 +27,7 @@ arch: # needs to add encoder, modulation type
   hyponet:
     type: mlp
     n_layer: 6 # including the output layer
-    hidden_dim: [256,256,256,128,128] # list, assert len(hidden_dim) in [1, n_layers-1]
+    hidden_dim: [256,256,256,256,128] # list, assert len(hidden_dim) in [1, n_layers-1]
     use_bias: true
     input_dim: 3
     output_dim: 1
@@ -36,8 +36,8 @@ arch: # needs to add encoder, modulation type
       type: 3d
       trainable: false
       use_ff: true
-      ff_sigma: 5 # ff_dim = 2*ff_sigma *3 + (3)
-      ff_dim: 33
+      ff_sigma: 7 # ff_dim = 2*ff_sigma *3 + (3)
+      ff_dim: 45
 
     activation:
       type: relu
@@ -56,32 +56,32 @@ loss:
 
 optimizer:
   type: adam
-  init_lr: 0.001
+  init_lr: 0.0001
   weight_decay: 0.0001
   betas: [0.9, 0.95] #[0.9, 0.95]
   warmup:
     epoch: 0
     multiplier: 1
     buffer_epoch: 0
-    min_lr: 0.000000001
+    min_lr: 0.000001
     mode: adaptive
     start_from_zero: True
     step_size: 30
     gamma: 0.1
     patience: 30
     patience_adaptive: 200
-    factor: 0.9
+    factor: 0.8
     threshold: 0
 
   max_gn: null
 
 experiment:
   amp: True
-  batch_size: 4
-  total_batch_size: 4
-  epochs: 300
+  batch_size: 1
+  total_batch_size: 1
+  epochs: 500
   epochs_cos: 250
-  save_ckpt_freq: 50
+  save_ckpt_freq: 10
   test_freq: 1
-  test_imlog_freq: 50
+  test_imlog_freq: 5
 

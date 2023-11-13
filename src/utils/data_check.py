@@ -4,12 +4,13 @@ import numpy as np
 # part 1 for checking generated data
 
 # Generate some sample data (replace this with your actual data)
-shape_path = '/home/umaru/praktikum/changed_version/ginr-ipc/data/test_data/shape.npy'
+shape_path = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/overfit/2a966a7e0b07a5239a6e43b878d5b335.obj.npy'
 data = np.load(shape_path)
 
-num_points = data.shape[0]
-points = data[:,:3]
-bool_values = data[:,3].astype(bool)
+points_uniform=128**3
+num_points = data[:-points_uniform,3].shape[0]
+points = data[:-points_uniform,:3]
+bool_values = data[:-points_uniform,3].astype(bool)
 
 
 # Create Open3D point cloud

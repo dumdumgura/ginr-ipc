@@ -21,9 +21,10 @@ def default_parser():
     #parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
     parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta_overfit.yaml")
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/")
-    parser.add_argument("-t", "--task", type=str, default="overfit_5_res_22")
-    #parser.add_argument("-l", "--load-path", type=str, default="./results.tmp/shapenet_meta/gen_5_ml13_f128/epoch300_model.pt")
-    parser.add_argument("-l", "--load-path", type=str,default="")
+    parser.add_argument("-t", "--task", type=str, default="overfit_ml13_occ_128_reweight_100_11")
+
+    parser.add_argument("-l", "--load-path", type=str, default="/home/umaru/praktikum/changed_version/ginr-ipc/results.tmp/shapenet_meta/gen_ml13_occ_128_reweight_100_5/epoch60_model.pt")
+    #parser.add_argument("-l", "--load-path", type=str,default="")
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--eval", action="store_true")

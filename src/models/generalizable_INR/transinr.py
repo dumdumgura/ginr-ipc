@@ -109,7 +109,7 @@ class TransINR(nn.Module):
     def encode_latent(self, xs_embed):
         return self.latent_mapping(xs_embed)
 
-    def compute_loss(self, preds, targets, reduction="ce",modulation_list=None,reg=None):
+    def compute_loss(self, preds, targets, reduction="ce",modulation_list=None,label=None):
         assert reduction in ["mean", "sum", "ce","none"]
         batch_size = preds.shape[0]
         sample_mses = torch.reshape((preds - targets) ** 2, (batch_size, -1)).mean(dim=-1)
@@ -132,8 +132,20 @@ class TransINR(nn.Module):
             #total_loss = -targets * torch.log(logits)   -  (1-targets)* torch.log(1-logits)
             #total_loss = torch.clamp(total_loss, min=threshold,max=threshold_max)
 
-            total_loss = torch.nn.BCEWithLogitsLoss(reduction='none')(preds, targets)
-            total_loss = torch.reshape(total_loss, (batch_size, -1)).mean(dim=-1)
+            total_loss_orig = torch.nn.BCEWithLogitsLoss(reduction='none')(preds, targets)
+            onsurface_loss = 0
+            spatial_loss = 0
+
+            total_loss = torch.reshape(total_loss_orig, (batch_size, -1)).mean(dim=-1)
+            total_loss= total_loss.sum()
+            psnr = -10 * torch.log10(total_loss)
+
+            if label is not None:
+                onsurface_loss = label * total_loss_orig
+                spatial_loss = (1-label) * total_loss_orig
+                onsurface_loss = onsurface_loss.sum()
+                spatial_loss = spatial_loss.sum()
+                total_loss = onsurface_loss + 100 * spatial_loss
 
             #regularization:
             if modulation_list is not None:
@@ -141,8 +153,7 @@ class TransINR(nn.Module):
                     #total_loss = total_loss + reg* factor.norm(dim=[1, 2])
                     pass
 
-            total_loss=total_loss.sum()
-            psnr = -10 * torch.log10(total_loss)
+
             pass
         else:
             total_loss = sample_mses
@@ -152,7 +163,7 @@ class TransINR(nn.Module):
             print('a')
             pass
 
-        return {"loss_total": total_loss, "mse": total_loss, "psnr": psnr}
+        return {"loss_total": total_loss, "mse": total_loss, "psnr": psnr,"onsurface_loss":onsurface_loss,"spatial_loss":spatial_loss}
 
     def sample_coord_input(self, xs, coord_range=None, upsample_ratio=1.0, device=None):
         device = device if device is not None else xs.device

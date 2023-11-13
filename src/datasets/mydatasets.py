@@ -31,8 +31,8 @@ class ShapeNet(Dataset):
 
 
         for file in os.listdir(self.data_source):
-            if file in filter_list:
-                files.append(file)
+            #if file in filter_list:
+            files.append(file)
 
 
         self.npyfiles = files
@@ -47,8 +47,10 @@ class ShapeNet(Dataset):
         pts = point_cloud.shape[0]
         coords = point_cloud[:,:3]
         occs = point_cloud[:,3].reshape(pts,1)
+        labels = point_cloud[:, 4].reshape(pts, 1)
         return  {"coords": torch.from_numpy(coords).float(),
-            "occ": torch.from_numpy(occs)
+            "occ": torch.from_numpy(occs),
+            "label": torch.from_numpy(labels)
         }
 
 class Pointcloud(Dataset):
@@ -62,15 +64,20 @@ class Pointcloud(Dataset):
         )
         self.coords = point_cloud[:, :3]
         self.occupancies = point_cloud[:, 3].reshape(-1,1)
+        self.labels = point_cloud[:, 4].reshape(-1, 1)
 
     def __len__(self):
-        return self.coords.shape[0]
+        return int(self.coords.shape[0] / 5000)
 
     def __getitem__(self, idx):
-        coords = self.coords[idx]
-        occs = self.occupancies[idx]
+        idx_size = 5000
+        #idx = np.random.randint(self.coords.shape[0], size=idx_size)
+        coords = self.coords[idx*idx_size:idx*idx_size+idx_size]
+        occs = self.occupancies[idx*idx_size:idx*idx_size+idx_size]
+        labels = self.labels[idx*idx_size:idx*idx_size+idx_size]
         return  {"coords": torch.from_numpy(coords).float(),
-            "occ": torch.from_numpy(occs)
+                 "occ": torch.from_numpy(occs),
+                 "label": torch.from_numpy(labels)
         }
 
 

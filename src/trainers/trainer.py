@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 
 import torch
 
@@ -26,7 +27,7 @@ class TrainerTemplate:
     ):
         super().__init__()
 
-        num_workers = 16
+        num_workers = 20
 
         if SMOKE_TEST:
             if not torch.distributed.is_initialized():
@@ -56,7 +57,7 @@ class TrainerTemplate:
         self.loader_trn = DataLoader(
             self.dataset_trn,
             #sampler=self.sampler_trn,
-            shuffle=True,
+            shuffle=False,
             pin_memory=True,
             batch_size=config.experiment.batch_size,
             num_workers=num_workers,
@@ -69,7 +70,7 @@ class TrainerTemplate:
         self.loader_val = DataLoader(
             self.dataset_val,
             #sampler=self.sampler_val,
-            shuffle=True,
+            shuffle=False,
             pin_memory=True,
             batch_size=config.experiment.batch_size,
             num_workers=num_workers,
@@ -95,6 +96,8 @@ class TrainerTemplate:
         for i in range(epoch_st, self.config.experiment.epochs):
             #self.sampler_trn.set_epoch(i)
             torch.cuda.empty_cache()
+            print("start_training")
+
             summary_trn = self.train(optimizer, scheduler, scaler, epoch=i)
 
 

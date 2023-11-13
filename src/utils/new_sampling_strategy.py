@@ -6,14 +6,16 @@ import numpy as np
 import igl
 import matplotlib.pyplot as plt
 
+
+
 #strategy = 'sdf'
-strategy = 'occ'
+#strategy = 'occ'
+strategy = 'occ_grid'
 
+folder = './data/shapenet_mesh/manifold'
+save_folder = './data/shapenet/sampling_results'
 
-folder = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/val_obj'
-save_folder = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/val_overfit'
-
-filter = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/shape_filter_small.txt'
+filter = './data/shapenet/single_filter.txt'
 
 files = []
 filter_list = []
@@ -44,11 +46,11 @@ for file in files:
     #self.obj = obj
 
     #total_points =  1000000
-    n_points_uniform = 30000 # int(total_points * 0.5)
-    n_points_surface = 40000 # total_points
+    n_points_uniform = 300 # int(total_points * 0.5)
+    n_points_surface = 400 # total_points
 
-    n_points_surface = 1000000
-    n_points_uniform = 1000000
+    #n_points_surface = 1000000
+    #n_points_uniform = 1000000
 
 
     if strategy == 'occ':
@@ -111,6 +113,43 @@ for file in files:
         save_path = os.path.join(save_folder,file)
         np.save(save_path,point_cloud)
 
+    elif strategy == 'occ_grid':
+        mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
+        scene = o3d.t.geometry.RaycastingScene()
+        _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
+
+        min_bound = mesh.vertex.positions.min(0).numpy()
+        max_bound = mesh.vertex.positions.max(0).numpy()
+
+        #min_bound = np.array([-0.5,-0.5,-0.5])
+        #max_bound = np.array([0.5, 0.5, 0.5])
+        
+        min_bound = np.array([min_bound,min_bound,min_bound])
+        max_bound = np.array([max_bound, max_bound, max_bound])
+        
+        xyz_range = np.linspace(min_bound, max_bound, num=256)
+
+        # query_points is a [32,32,32,3] array ..
+        grid = np.meshgrid(*xyz_range.T)
+        query_points = np.stack(grid, axis=-1).astype(np.float32)
+        
+        
+        # signed distance is a [32,32,32] array
+        signed_distance = scene.compute_signed_distance(query_points).numpy()
+        occupancy = scene.compute_occupancy(query_points).numpy()
+        
+        print(str(signed_distance.shape)+"_"+str(occupancy.shape))
+
+        sdf_volume = np.concatenate([query_points,signed_distance[:,:,:,None],occupancy[:,:,:,None]],axis=-1)
+        print(sdf_volume.shape)
+
+        sdf_data= sdf_volume.reshape((-1,5))
+        
+        save_path = os.path.join(save_folder,file + '_' + strategy)
+        np.save(save_path, occupancy)
+        
+        plt.imshow(signed_distance[16, : , :])
+        
     else:
         mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
         scene = o3d.t.geometry.RaycastingScene()
@@ -149,6 +188,7 @@ for file in files:
 
         sdf_data= sdf_volume.reshape((-1,5))
 
+        
         # We can visualize a slice of the distance field directly with matplotlib
         #plt.imshow(signed_distance.numpy()[16, : , :])
 

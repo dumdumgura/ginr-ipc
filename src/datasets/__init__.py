@@ -15,11 +15,11 @@ def create_dataset(config, is_eval=False, logger=None):
 
     if config.dataset.type =="shapenet":
         if config.type == 'overfit':
-            dataset_trn = Pointcloud(config.dataset.folder, split="train")
-            dataset_val = Pointcloud(config.dataset.folder, split="val")
+            dataset_trn = Pointcloud(config.dataset.folder, split="train",type=config.dataset.supervision)
+            dataset_val = Pointcloud(config.dataset.folder, split="val",type=config.dataset.supervision)
         else:
-            dataset_trn = ShapeNet(config.dataset.folder, split="train")
-            dataset_val = ShapeNet(config.dataset.folder, split="val")
+            dataset_trn = ShapeNet(config.dataset.folder, split="train",type=config.dataset.supervision)
+            dataset_val = ShapeNet(config.dataset.folder, split="val",type=config.dataset.supervision)
 
     elif config.dataset.type == "imagenette":
         dataset_trn = ImageNette(split="train", transform=transforms_trn)

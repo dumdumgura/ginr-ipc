@@ -355,7 +355,7 @@ if __name__ == "__main__":
             final_res = 1024
             res = resolution0
 
-            threshold = 0.0
+            threshold = -0.01
             multi_grid_extractor = MultiGridExtractor(resolution0, threshold)
 
             for i in range(4):

@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import os
-
+import copy
 from functools import *
 from .configs import MetaLowRankModulatedINRConfig
 from .modules.coord_sampler import CoordSampler
@@ -150,7 +150,12 @@ class MetaLowRankModulatedINR(TransINR):
             self.hyponet.ignore_base_param_dict[name] = True
 
         self.n_inner_step = self.config.n_inner_step
-        self.inner_lr = self.config.inner_lr
+        self.inner_lr = copy.copy(self.config.inner_lr)
+        #self.lr = torch.nn.Parameter(torch.Tensor([copy.copy(self.config.inner_lr)]))
+        #self.lr = nn.ParameterList([nn.Parameter(torch.Tensor([copy.copy(self.config.inner_lr)]))
+        #                            for _ in range(self.config.n_inner_step)])
+        self.lr = nn.ParameterList([nn.Parameter(torch.Tensor([copy.copy(self.config.inner_lr)]))
+                               for _ in config.modulated_layer_idxs])
 
 
         #for overfit:
@@ -187,7 +192,7 @@ class MetaLowRankModulatedINR(TransINR):
         return outputs
 
 
-    def decode_with_modulation_factors(self, xs, modulation_factors_dict, coord=None,overfit=False):
+    def decode_with_modulation_factors(self, xs, modulation_factors_dict, coord=None,overfit=False,type='occ'):
         r"""Inference function on Hyponet, modulated via given modulation factors."""
         #coord = self.sample_coord_input(xs) if coord is None else coord
 
@@ -206,7 +211,7 @@ class MetaLowRankModulatedINR(TransINR):
         #    )
         #    meshes.extend(mesh)
         meshes = create_meshes(
-                self.hyponet,modulation_params_dict,level=0, N=512,overfit=overfit
+                self.hyponet, modulation_params_dict,level=0.0, N=256,overfit=overfit,type=type
                 )
 
         return meshes
@@ -219,12 +224,15 @@ class MetaLowRankModulatedINR(TransINR):
         coord: Tensor,
         inner_lr: Tensor,
         is_training: bool = True,
+        type='sdf',
+        step=4
     ):
         r"""Single adaptation step of modulation factors via SGD w.r.t. the reconstruction loss for `xs`."""
 
         with torch.enable_grad():
             # compute reconstruction
-            recons = self.predict_with_modulation_factors(xs, modulation_factors_dict, coord)
+            shape = xs[:,:,0] if type=='sdf' else xs
+            recons = self.predict_with_modulation_factors(shape, modulation_factors_dict, coord)
 
             factor_names = list(modulation_factors_dict.keys())
             modulation_factors_list = list(modulation_factors_dict.values())
@@ -235,14 +243,16 @@ class MetaLowRankModulatedINR(TransINR):
                 loss_type = 'mean'
             else:
                 loss_type = 'ce'
-            metrics = self.compute_loss(recons, xs, reduction=loss_type,modulation_list=modulation_factors_list)
+
+            metrics = self.compute_loss(recons, xs, reduction=loss_type,modulation_list=modulation_factors_list,type=type,coords=coord,mode='sum')
 
             # compute gradient w.r.t. latents
-            grads_list = torch.autograd.grad(metrics["loss_total"], modulation_factors_list, create_graph=is_training)
+            grads_list = torch.autograd.grad(metrics["loss_total"], modulation_factors_list, create_graph=False)
 
             # take an SGD step
             new_modulation_factors_dict = {}
-            for name, factor, grad in zip(factor_names, modulation_factors_list, grads_list):
+            for i, pack in enumerate(zip(factor_names, modulation_factors_list, grads_list)):
+                name, factor, grad = pack
                 if self.config.hyponet.normalize_weight:
                     lr_scale = factor.norm(dim=[1, 2], keepdim=True).pow(2.0)
                     #lr_scale = 1.0
@@ -256,9 +266,9 @@ class MetaLowRankModulatedINR(TransINR):
                 if grad.norm()>=1e2:
                     print("grad>1e2")
                     #new_factor = factor
-                    new_factor = factor - inner_lr * lr_scale * grad
+                    new_factor = factor - self.lr[i] * lr_scale * grad
                 else:
-                    new_factor = factor - inner_lr * lr_scale * grad
+                    new_factor = factor - self.lr[i] * lr_scale * grad
                 #print("new_factor_norm:" + str(new_factor.norm(dim=[1, 2], keepdim=True).mean().item()/factor.shape[0]))
 
                 #print("-------")
@@ -275,20 +285,21 @@ class MetaLowRankModulatedINR(TransINR):
         }
         return new_modulation_factors_dict, logs
 
-    def inner_loop(self, xs, coord=None, n_inner_step=1, inner_lr=0.1, is_training=True):
+    def inner_loop(self, xs, coord=None, n_inner_step=1, inner_lr=0.1, is_training=True,type='sdf'):
         r"""A loop of latent adaptation steps, served as the inner loop of meta-learning."""
 
         # We assume that inner loop uses the coords of shape identical to the spatial shape of xs, while not using
         # coordinate subsampling. For this reason, we compute `coord` from `xs` in the inner loop.
-        coord = self.sample_coord_input(xs)if coord is None else coord
+        shape = xs[:,:,0] if type == 'sdf' else xs
 
-        modulation_factors_dict = self.get_init_modulation_factors(xs)
+        coord = self.sample_coord_input(xs)if coord is None else coord
+        modulation_factors_dict = self.get_init_modulation_factors(shape)
 
         inner_loop_history = []
 
         for step_idx in range(n_inner_step):
             modulation_factors_dict, logs = self.inner_step(
-                xs, modulation_factors_dict, coord, inner_lr, is_training=is_training
+                xs, modulation_factors_dict, coord, inner_lr, is_training=is_training,type=type,step=step_idx
             )
             inner_loop_history.append(logs)
 
@@ -316,8 +327,10 @@ class MetaLowRankModulatedINR(TransINR):
                 tensors = torch.stack(tensors, dim=1)
             collated[key] = tensors
         return collated
+    def get_lr(self):
+        return self.lr[0].detach().clone()
 
-    def forward(self, xs, coord=None, n_inner_step=None, inner_lr=None, is_training=None,vis=False):
+    def forward(self, xs, coord=None, n_inner_step=None, inner_lr=None, is_training=None,vis=False,label=None,type='sdf'):
         r"""Infers the signal values at the given coordinates, after an inner loop adapted for `xs`.
 
         Arguments:
@@ -327,6 +340,8 @@ class MetaLowRankModulatedINR(TransINR):
             inner_lr (float, optional): learning rate used in inner steps. (Default: `self.inner_lr`)
             is_training (bool, optional): indicates whether it is in training context. (Default: `self.training`)
         """
+        shape = xs[:,:,0] if type == 'sdf' else xs
+
 
         coord = self.sample_coord_input(xs) if coord is None else coord
 
@@ -335,26 +350,27 @@ class MetaLowRankModulatedINR(TransINR):
         is_training = self.training if is_training is None else is_training
 
         modulation_factors_dict, inner_loop_history = self.inner_loop(
-            xs, coord = coord, n_inner_step=n_inner_step, inner_lr=inner_lr, is_training=is_training
+            xs, coord = coord, n_inner_step=n_inner_step, inner_lr=inner_lr, is_training=is_training,type=type
         )
-        outputs = self.predict_with_modulation_factors(xs, modulation_factors_dict, coord)
+
+        outputs = self.predict_with_modulation_factors(shape, modulation_factors_dict, coord)
 
         collated_history = self._collate_inner_loop_history(inner_loop_history)
 
         if vis:
-            visuals = self.decode_with_modulation_factors(xs, modulation_factors_dict, coord)
+            visuals = self.decode_with_modulation_factors(xs, modulation_factors_dict, coord,type=type)
             return outputs, visuals, collated_history
         else:
             return outputs, modulation_factors_dict, collated_history
 
-    def overfit_one_shape(self, xs, coord,vis=False):
+    def overfit_one_shape(self, xs, coord,vis=False,type='occ'):
         modulation_factors_dict = self.get_init_modulation_factors_overfit()
         # convert modulation factors into modulation params
         modulation_params_dict = self.factors.compute_modulation_params_dict_overfit(modulation_factors_dict)
 
         if vis:
 
-            visuals = self.decode_with_modulation_factors(xs, modulation_params_dict, coord,overfit=True)
+            visuals = self.decode_with_modulation_factors(xs, modulation_params_dict, coord,overfit=True,type=type)
             return visuals
         #get the modulation param
 

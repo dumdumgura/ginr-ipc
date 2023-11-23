@@ -19,12 +19,12 @@ def default_parser():
     parser = argparse.ArgumentParser()
     #parser.add_argument("-m", "--model-config", type=str, default="./configs/meta_learning/low_rank_modulated_meta/imagenette178_meta_low_rank.yaml")
     #parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
-    parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta_overfit.yaml")
+    parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta_sdf_overfit.yaml")
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/")
-    parser.add_argument("-t", "--task", type=str, default="overfit_ml13_occ_128_reweight_100_11")
+    parser.add_argument("-t", "--task", type=str, default="overfit_7_repeat_loss_all_wd0.0001")
 
-    parser.add_argument("-l", "--load-path", type=str, default="/home/umaru/praktikum/changed_version/ginr-ipc/results.tmp/shapenet_meta/gen_ml13_occ_128_reweight_100_5/epoch60_model.pt")
-    #parser.add_argument("-l", "--load-path", type=str,default="")
+    parser.add_argument("-l", "--load-path", type=str, default="/home/umaru/praktikum/changed_version/ginr-ipc/results.tmp/shapenet_meta_sdf/gen_1_repeat_loss_all_wd0.0001/epoch450_model.pt")
+   # parser.add_argument("-l", "--load-path", type=str,default="")
     parser.add_argument("-p", "--postfix", type=str, default="")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--eval", action="store_true")
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
         optimizer = create_optimizer(model, config)
         scheduler = create_scheduler(
-            optimizer, config.optimizer.warmup, steps_per_epoch, config.experiment.epochs_cos, distenv
+            optimizer, config.optimizer.warmup, config.optimizer.warmup.step_size, config.experiment.epochs_cos, distenv
         )
         
         if distenv.master:

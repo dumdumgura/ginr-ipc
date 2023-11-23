@@ -148,7 +148,8 @@ def create_meshes(
     scale=None,
     level=0,
     time_val=-1,
-    overfit=False
+    overfit=False,
+    type='occ'
 ):
     #especailly for hyponet visualization
     if overfit:
@@ -163,7 +164,7 @@ def create_meshes(
     decoder.eval()
 
     # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
-    voxel_origin = [-0.5] * 3
+    voxel_origin = [-1] * 3
     voxel_size = -2 * voxel_origin[0] / (N - 1)
 
     overall_index = torch.arange(0, N**3, 1, out=torch.LongTensor())
@@ -198,14 +199,24 @@ def create_meshes(
 
 
         if overfit:
-            samples[head: min(head + max_batch, num_samples), 3] = (
-                decoder.forward_overfit(sample_subset, modulation_params_dict=modulation_params_dict).squeeze().detach().cpu()
-            # .squeeze(1)
-            )
+            if type =='sdf':
+                samples[head: min(head + max_batch, num_samples), 3] = (
+                    decoder.forward_overfit(sample_subset, modulation_params_dict=modulation_params_dict).squeeze().detach().cpu()[:,1]
+                # .squeeze(1)
+                )
+            else:
+                samples[head: min(head + max_batch, num_samples), 3] = (
+                    decoder.forward_overfit(sample_subset, modulation_params_dict=modulation_params_dict).squeeze().detach().cpu()
+                )
         else:
-            samples[:,head : min(head + max_batch, num_samples), 3] = (
-                decoder(sample_subset,modulation_params_dict=modulation_params_dict).squeeze().detach().cpu()  # .squeeze(1)
-            )
+            if type == 'sdf':
+                samples[:,head : min(head + max_batch, num_samples), 3] = (
+                    decoder(sample_subset,modulation_params_dict=modulation_params_dict).detach().cpu()[:,:,1]  # .squeeze(1)
+                )
+            else:
+                samples[:,head : min(head + max_batch, num_samples), 3] = (
+                    decoder(sample_subset,modulation_params_dict=modulation_params_dict).detach().cpu() # .squeeze(1)
+                )
         head += max_batch
 
     meshes=[]
@@ -288,33 +299,5 @@ def convert_sdf_samples_to_ply(
     if offset is not None:
         mesh_points = mesh_points - offset
 
-    # try writing to the ply file
-
-    num_verts = verts.shape[0]
-    num_faces = faces.shape[0]
-
-    verts_tuple = np.zeros((num_verts,), dtype=[("x", "f4"), ("y", "f4"), ("z", "f4")])
-
-    for i in range(0, num_verts):
-        verts_tuple[i] = tuple(mesh_points[i, :])
-
-    faces_building = []
-    for i in range(0, num_faces):
-        faces_building.append(((faces[i, :].tolist(),)))
-    faces_tuple = np.array(faces_building, dtype=[("vertex_indices", "i4", (3,))])
-
-    if ply_filename_out is not None:
-        el_verts = plyfile.PlyElement.describe(verts_tuple, "vertex")
-        el_faces = plyfile.PlyElement.describe(faces_tuple, "face")
-
-        ply_data = plyfile.PlyData([el_verts, el_faces])
-        logging.debug("saving mesh to %s" % (ply_filename_out))
-        ply_data.write(ply_filename_out)
-
-    logging.debug(
-        "converting to ply format and writing to file took {} s".format(
-            time.time() - start_time
-        )
-    )
 
     return mesh_points, faces, pytorch_3d_sdf_tensor

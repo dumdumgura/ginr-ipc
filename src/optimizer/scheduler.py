@@ -1,6 +1,6 @@
 import math
 import torch
-from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau,StepLR
 
 
 def create_scheduler(optimizer, config, steps_per_epoch, max_epoch, distenv=None):
@@ -23,6 +23,8 @@ def create_scheduler(optimizer, config, steps_per_epoch, max_epoch, distenv=None
             threshold=config.threshold,
             min_lr=config.min_lr,
         )
+    if mode == 'step':
+        scheduler = StepLR(optimizer,step_size=steps_per_epoch,gamma=config.factor)
 
     if warmup_steps > 0.0:
         if mode == "linear":

@@ -3,7 +3,7 @@ trainer: stage_inr
 dataset:
   type: shapenet
   supervision: sdf
-  folder: /home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/sdf_test/npy/test.npy
+  folder: /home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/sdf_pc_30w/2bdb44eece3409a5a18e0889038e4fb6.obj.npy
   transforms:
     type: shapenet
 
@@ -12,10 +12,10 @@ arch: # needs to add encoder, modulation type
   ema: null
 
   rank: [128] # list, assert len(n_weight_groups) in [1, hyponet.n_layer]
-  modulated_layer_idxs: [1,3]
+  modulated_layer_idxs: [1,3,5,7]
   use_factorization:  false
 
-  n_inner_step: 4
+  n_inner_step: 5
   inner_lr: 0.003
 
 
@@ -27,7 +27,7 @@ arch: # needs to add encoder, modulation type
 
   hyponet:
     type: mlp
-    n_layer: 6 # including the output layer
+    n_layer: 8 # including the output layer
     hidden_dim: [256] # list, assert len(hidden_dim) in [1, n_layers-1]
     use_bias: true
     input_dim: 3
@@ -37,8 +37,8 @@ arch: # needs to add encoder, modulation type
       type: 3d
       trainable: false
       use_ff: true
-      ff_sigma: 24 # ff_dim = 2*ff_sigma *3 + (3)
-      ff_dim: 147
+      ff_sigma: 12 # ff_dim = 2*ff_sigma *3 + (3)
+      ff_dim: 75
 
     activation:
       type: relu
@@ -56,8 +56,8 @@ loss:
   coord_noise: null
 
 optimizer:
-  type: adam
-  init_lr: 0.001
+  type: overfit
+  init_lr: 0.01
   weight_decay: 0.0
 
   betas: [0.9, 0.95] #[0.9, 0.95]
@@ -66,12 +66,12 @@ optimizer:
     multiplier: 1
     buffer_epoch: 0
     min_lr: 0.0001
-    mode: adaptive
-    step_size: 200
-    gamma: 0.8
+    mode: step
+    step_size: 3000
+    gamma: 0.5
     patience: 30
-    patience_adaptive: 200
-    factor: 0.8
+    patience_adaptive: 30
+    factor: 0.5
     threshold: 0
     start_from_zero: True
   max_gn: null
@@ -80,9 +80,9 @@ experiment:
   amp: True
   batch_size: 1
   total_batch_size: 1
-  epochs: 600
+  epochs: 10000
   epochs_cos: 30
   save_ckpt_freq: 200
   test_freq: 30
-  test_imlog_freq: 10
+  test_imlog_freq: 100
 

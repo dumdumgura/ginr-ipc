@@ -123,7 +123,7 @@ class MultiGridExtractor(object):
 
     def extract_mesh(self):
         # Ensure that marching cubes is applied to the current resolution
-        occupancies = self.occupancies
+        occupancies = self.values
         vertices, faces, _, _ = measure.marching_cubes(occupancies, level=self.threshold)
 
         # You may want to perform additional processing on the mesh
@@ -159,7 +159,7 @@ def reconstruct_shape(meshes,epoch,it=0,mode='train'):
         sample_mesh.vertices = o3d.utility.Vector3dVector(vertices)
         sample_mesh.triangles = o3d.utility.Vector3iVector(faces)
         # Compute normals for the mesh
-        sample_mesh.compute_vertex_normals()
+        #sample_mesh.compute_vertex_normals()
         #d.visualization.draw_geometries([sample_mesh])
 
 
@@ -180,12 +180,12 @@ def reconstruct_shape(meshes,epoch,it=0,mode='train'):
 
         print('filter with average with 5 iterations')
         iter = int(epoch/40)
-        mesh_out = sample_mesh.filter_smooth_simple(number_of_iterations=5)
-        mesh_out.compute_vertex_normals()
-        o3d.visualization.draw_geometries([mesh_out])
+        #mesh_out = sample_mesh.filter_smooth_simple(number_of_iterations=5)
+        sample_mesh.compute_vertex_normals()
+        o3d.visualization.draw_geometries([sample_mesh],mesh_show_back_face=True)
 
 
-        verts,faces = np.asarray(mesh_out.vertices), np.asarray(mesh_out.triangles)
+        verts,faces = np.asarray(sample_mesh.vertices), np.asarray(sample_mesh.triangles)
 
 
 
@@ -238,7 +238,7 @@ def default_parser():
     #parser.add_argument("-m", "--model-config", type=str,  default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta.yaml")
     parser.add_argument("-m", "--model-config", type=str,default="./configs/meta_learning/low_rank_modulated_meta/shapenet_meta_overfit.yaml")
     parser.add_argument("-r", "--result-path", type=str, default="./results.tmp/")
-    parser.add_argument("-t", "--task", type=str, default="lerp_new_18")
+    parser.add_argument("-t", "--task", type=str, default="lerp_new_87w")
 
     parser.add_argument("-l", "--load-path", type=str, default="/home/umaru/praktikum/changed_version/ginr-ipc/results.tmp/shapenet_meta_overfit/overfit_ml13_occ_128_reweight_100_11/epoch1000_model.pt")
 
@@ -293,7 +293,8 @@ model_1.eval()
 resolution0 = 128
 res = resolution0
 
-threshold = 0.0
+threshold = 0
+
 multi_grid_extractor = MultiGridExtractor(resolution0, threshold)
 
 while True:
@@ -324,7 +325,7 @@ while True:
     # Simulate evaluating occupancy at the queried points
     # For simplicity, let's assume random values for illustration
     head = 0
-    max_batch=1024
+    max_batch=400000
     values_at_points = np.zeros((num_samples,1))
 
 
@@ -362,7 +363,7 @@ while True:
     multi_grid_extractor.increase_resolution()
 
     res=res*2
-    if res >= 2047:
+    if res >= 4096:
         break
         print("break")
 

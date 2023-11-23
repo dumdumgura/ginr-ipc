@@ -16,24 +16,25 @@ class ShapeNet(Dataset):
     def __init__(
         self,
         dataset_folder,
-        split
+        split,
+        type
     ):
         self.split = split
         self.data_source = os.path.join(dataset_folder,split)
-        self.filter = os.path.join(dataset_folder,'shape_filter_small.txt')
-
+        #self.filter = os.path.join(dataset_folder,'shape_filter_small.txt')
+        self.num_sample_points = 20000
+        self.type = type
         files = []
         filter_list=[]
-        with open(self.filter,"r") as text:
-            for line in text:
-                file_name = line.strip()
-                filter_list.append(file_name+".npy")
+        #with open(self.filter,"r") as text:
+        #    for line in text:
+        #        file_name = line.strip()
+        #        filter_list.append(file_name+".npy")
 
 
         for file in os.listdir(self.data_source):
             #if file in filter_list:
             files.append(file)
-
 
         self.npyfiles = files
 
@@ -41,44 +42,140 @@ class ShapeNet(Dataset):
         return len(self.npyfiles)
 
     def __getitem__(self, idx):
-        point_cloud = np.load(
-            os.path.join(self.data_source, self.npyfiles[idx]),allow_pickle=True
-        )
-        pts = point_cloud.shape[0]
-        coords = point_cloud[:,:3]
-        occs = point_cloud[:,3].reshape(pts,1)
-        labels = point_cloud[:, 4].reshape(pts, 1)
-        return  {"coords": torch.from_numpy(coords).float(),
-            "occ": torch.from_numpy(occs),
-            "label": torch.from_numpy(labels)
-        }
+
+        #idx = np.random.randint(self.coords.shape[0], size=idx_size)
+        idx_size = self.num_sample_points
+
+        if self.type == 'sdf':
+            path = os.path.join(self.data_source,self.npyfiles[idx])
+            point_cloud = np.load(path)
+            self.coords = point_cloud[:, :3]
+            self.sdf = point_cloud[:, 3].reshape(-1, 1)
+            # self.sdf = np.clip(self.sdf, -0.1, 0.1)
+            self.normals = point_cloud[:, 4:7]
+            self.labels = np.zeros_like(self.sdf)
+            self.labels[np.where(self.sdf < 0.01)[0]] = 1
+
+            positive_indices = np.where(self.sdf > 0)[0]  # stands for inside, I Think
+            negative_indices = np.where(self.sdf < 0)[0]
+            self.tensor = np.concatenate([self.coords, self.sdf, self.normals, self.labels], axis=-1)
+            self.pos_tensor = self.tensor[positive_indices, :]
+            self.neg_tensor = self.tensor[negative_indices, :]
+
+            sample= self.create_sdf_sample(idx)
+            return {"coords": torch.from_numpy(sample[:,:3]).float(),
+                    "sdf": torch.from_numpy(sample[:,3][:,None]),
+                    "label":torch.from_numpy(sample[:,7][:,None]),
+                    "normal":torch.from_numpy(sample[:,4:7]).float()
+                    }
+
+        else:
+            #do not use any more
+            point_cloud = np.load(self.npyfiles[idx])
+            coords = point_cloud[idx*idx_size:idx*idx_size+idx_size]
+            occs = self.occupancies[idx*idx_size:idx*idx_size+idx_size]
+            labels = self.labels[idx*idx_size:idx*idx_size+idx_size]
+            return  {"coords": torch.from_numpy(coords).float(),
+                     "occ": torch.from_numpy(occs),
+                     "label": torch.from_numpy(labels)
+            }
+
+    def create_sdf_sample(self,idx):
+
+        pos_num = int(self.num_sample_points / 2)
+        neg_num = int(self.num_sample_points - pos_num)
+
+        #a=a[torch.randperm(a.size()[0])] row shuffling
+        pos_tensor_sel = self.pos_tensor[np.random.permutation(self.pos_tensor.shape[0])][:pos_num,:]
+        neg_tensor_sel = self.neg_tensor[np.random.permutation(self.neg_tensor.shape[0])][:neg_num,:]
+
+        # TODO: Implement such that you return a pytorch float32 torch tensor of shape (self.num_sample_points, 4)
+        # the returned tensor shoud have approximately self.num_sample_points/2 randomly selected samples from pos_tensor
+        # and approximately self.num_sample_points/2 randomly selected samples from neg_tensor
+        return np.concatenate([pos_tensor_sel,neg_tensor_sel],axis=0)
+        pass
+
+
+
+
 
 class Pointcloud(Dataset):
     def __init__(
         self,
         pc_path,
-        split
+        split,
+        type
     ):
         point_cloud = np.load(
             pc_path
         )
-        self.coords = point_cloud[:, :3]
-        self.occupancies = point_cloud[:, 3].reshape(-1,1)
-        self.labels = point_cloud[:, 4].reshape(-1, 1)
+        self.type = type
+        if self.type =='sdf':
+            self.coords = point_cloud[:, :3]
+            #self.occupancies = point_cloud[:, 3].reshape(-1, 1)
+            self.sdf = point_cloud[:, 3].reshape(-1, 1)
+            #self.sdf = np.clip(self.sdf, -0.1, 0.1)
+            #self.labels = point_cloud[:, 5].reshape(-1, 1)
+            self.normals = point_cloud[:,4:7]
+
+            self.labels = np.zeros_like(self.sdf)
+            self.labels[np.where(self.sdf<0.01)[0]] = 1
+
+            positive_indices = np.where(self.sdf > 0)[0]  #stands for inside, I Think
+            negative_indices = np.where(self.sdf < 0)[0]
+            self.tensor = np.concatenate([self.coords,self.sdf,self.normals,self.labels],axis=-1)
+            self.pos_tensor = self.tensor[positive_indices,:]
+            self.neg_tensor = self.tensor[negative_indices,:]
+
+            self.num_sample_points = 20000
+
+            # truncate sdf values
+
+        else:
+            self.coords = point_cloud[:, :3]
+            self.occupancies = point_cloud[:, 3].reshape(-1,1)
+            self.labels = point_cloud[:, 4].reshape(-1, 1)
 
     def __len__(self):
-        return int(self.coords.shape[0] / 5000)
+        return int(self.coords.shape[0] / self.num_sample_points)
 
     def __getitem__(self, idx):
-        idx_size = 5000
+
         #idx = np.random.randint(self.coords.shape[0], size=idx_size)
-        coords = self.coords[idx*idx_size:idx*idx_size+idx_size]
-        occs = self.occupancies[idx*idx_size:idx*idx_size+idx_size]
-        labels = self.labels[idx*idx_size:idx*idx_size+idx_size]
-        return  {"coords": torch.from_numpy(coords).float(),
-                 "occ": torch.from_numpy(occs),
-                 "label": torch.from_numpy(labels)
-        }
+        idx_size = self.num_sample_points
+        if self.type == 'sdf':
+
+            sample= self.create_sdf_sample(idx)
+            return {"coords": torch.from_numpy(sample[:,:3]).float(),
+                    "sdf": torch.from_numpy(sample[:,3][:,None]),
+                    "label":torch.from_numpy(sample[:,7][:,None]),
+                    "normal":torch.from_numpy(sample[:,4:7]).float()
+                    }
+
+        else:
+            coords = self.coords[idx*idx_size:idx*idx_size+idx_size]
+            occs = self.occupancies[idx*idx_size:idx*idx_size+idx_size]
+            labels = self.labels[idx*idx_size:idx*idx_size+idx_size]
+            return  {"coords": torch.from_numpy(coords).float(),
+                     "occ": torch.from_numpy(occs),
+                     "label": torch.from_numpy(labels)
+            }
+
+    def create_sdf_sample(self,idx):
+
+        pos_num = int(self.num_sample_points / 2)
+        neg_num = int(self.num_sample_points - pos_num)
+
+        #a=a[torch.randperm(a.size()[0])] row shuffling
+        pos_tensor_sel = self.pos_tensor[np.random.permutation(self.pos_tensor.shape[0])][:pos_num,:]
+        neg_tensor_sel = self.neg_tensor[np.random.permutation(self.neg_tensor.shape[0])][:neg_num,:]
+
+        # TODO: Implement such that you return a pytorch float32 torch tensor of shape (self.num_sample_points, 4)
+        # the returned tensor shoud have approximately self.num_sample_points/2 randomly selected samples from pos_tensor
+        # and approximately self.num_sample_points/2 randomly selected samples from neg_tensor
+        return np.concatenate([pos_tensor_sel,neg_tensor_sel],axis=0)
+        pass
+
 
 
 class ImageNette(Dataset):

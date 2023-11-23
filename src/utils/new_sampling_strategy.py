@@ -6,17 +6,18 @@ import numpy as np
 import igl
 import matplotlib.pyplot as plt
 
-#strategy = 'sdf'
-strategy = 'occ'
+strategy = 'sdf'
+#strategy = 'occ'
 
 
-folder = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/val_obj'
-save_folder = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/val_overfit'
+folder = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/sdf_test/obj'
+save_folder = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/sdf_test/npy'
 
 filter = '/home/umaru/praktikum/changed_version/ginr-ipc/data/shapenet/shape_filter_small.txt'
 
 files = []
 filter_list = []
+
 with open(filter, "r") as text:
     for line in text:
         file_name = line.strip()
@@ -112,42 +113,95 @@ for file in files:
         np.save(save_path,point_cloud)
 
     else:
-        mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
-        scene = o3d.t.geometry.RaycastingScene()
-        _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
-
-        min_bound = mesh.vertex.positions.min(0).numpy()
-        max_bound = mesh.vertex.positions.max(0).numpy()
-
-        min_bound = np.array([-0.5,-0.5,-0.5])
-        max_bound = np.array([0.5, 0.5, 0.5])
-        xyz_range = np.linspace(min_bound, max_bound, num=64)
-
-        # query_points is a [32,32,32,3] array ..
-        grid = np.meshgrid(*xyz_range.T)
-        query_points = np.stack(grid, axis=-1).astype(np.float32)
-
-
         start = time.time()
         print('sampling near surface...')
-        points_surface = np.asarray(mesh.sample_points_poisson_disk(number_of_points=n_points_surface).points)
-        end = time.time()
-        print('sampling takes: '+str(end-start))
-        res = 0.0001
+        res = 32
+
+        num_points = res ** 3
+        min_bound = np.array([-0.5, -0.5, -0.5])
+        max_bound = np.array([0.5, 0.5, 0.5])
+        xyz_range = np.linspace(min_bound, max_bound, num=res)
+
+        grid = np.meshgrid(*xyz_range.T)
+
+        points_uniform = np.stack(grid, axis=-1).astype(np.float32).reshape(-1,3)
+
+        n_points_uniform =res**3
+        n_points_surface = 250000
+
+        points_surface = np.asarray(mesh.sample_points_poisson_disk(number_of_points=n_points_surface).points,dtype=np.float32)
         points_surface_1 = points_surface + 0.001 * np.random.randn(n_points_surface, 3)
         points_surface_2 = points_surface + 0.01 * np.random.randn(n_points_surface, 3)
 
+        query_points = np.concatenate([points_surface_1,points_surface_2, points_uniform], axis=0,dtype=np.float32)
+        labels = np.zeros(query_points.shape[0])
+        labels[:-n_points_uniform] = 1  #1 means near surface
 
-        # signed distance is a [32,32,32] array
-        signed_distance = scene.compute_signed_distance(query_points).numpy()
-        occupancy = scene.compute_occupancy(query_points).numpy()
+        # points_uniform = points_uniform.reshape((-1, 3))
 
-        print(str(signed_distance.shape)+"_"+str(occupancy.shape))
+        mesh_old = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
+        scene = o3d.t.geometry.RaycastingScene()
 
-        sdf_volume = np.concatenate([query_points,signed_distance[:,:,:,None],occupancy[:,:,:,None]],axis=-1)
-        print(sdf_volume.shape)
+        _ = scene.add_triangles(mesh_old)  # we do not need the geometry ID for mesh
+        signed_distance = scene.compute_signed_distance(query_points).numpy().reshape(-1,1)
 
-        sdf_data= sdf_volume.reshape((-1,5))
+
+        # occupancy = scene.compute_occupancy(query_points).numpy()
+        inside_surface_values = igl.fast_winding_number_for_meshes(
+            np.asarray(mesh.vertices), np.asarray(mesh.triangles), query_points.reshape(-1, 3).astype(np.double)
+        )
+
+        thresh = 0.5
+
+
+        occupancies_winding = np.piecewise(
+            inside_surface_values,
+            [inside_surface_values < thresh, inside_surface_values >= thresh],
+            [1, -1],
+        )
+
+        # for vis:
+
+        #occupancies_winding_bool = np.piecewise(
+        #    inside_surface_values,
+        #    [inside_surface_values < thresh, inside_surface_values >= thresh],
+        #    [1, 0],
+        #)
+        #bool_values = occupancies_winding_bool.astype(bool)
+        # Create Open3D point cloud
+        #point_cloud = o3d.geometry.PointCloud()
+        #point_cloud.points = o3d.utility.Vector3dVector(query_points)
+
+        # Set colors based on boolean values
+        #colors = np.zeros((query_points.shape[0], 3))
+        #colors[bool_values] = [1, 0, 0]  # Set red color for True
+        #colors[~bool_values] = [0, 0, 1]  # Set blue color for False
+        #point_cloud.colors = o3d.utility.Vector3dVector(colors)
+        #o3d.visualization.draw_geometries([point_cloud],)
+
+        #occupancy = np.abs(occupancies_winding)
+
+        print(i)
+        i=i+1
+        point_cloud = np.concatenate([query_points.reshape(-1, 3),occupancies_winding[:,None],signed_distance,labels[:,None]],axis=-1)
+        print(point_cloud.shape)
+        print(i)
+        save_path = os.path.join(save_folder,file)
+        np.save(save_path,point_cloud)
+        end = time.time()
+        print('sampling takes: '+str(end-start))
+
+        # for visualization
+
+        #vertices, faces, _, _ = measure.marching_cubes(a, level=-0.003)
+        #sample_mesh = o3d.geometry.TriangleMesh()
+
+        #sample_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+        #sample_mesh.triangles = o3d.utility.Vector3iVector(faces)
+        # Compute normals for the mesh
+
+        #sample_mesh.compute_vertex_normals()
+        #o3d.visualization.draw_geometries([sample_mesh], mesh_show_back_face=True, mesh_show_wireframe=False)
 
         # We can visualize a slice of the distance field directly with matplotlib
         #plt.imshow(signed_distance.numpy()[16, : , :])

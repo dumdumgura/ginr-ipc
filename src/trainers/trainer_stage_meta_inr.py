@@ -21,7 +21,7 @@ class Trainer(TrainerTemplate):
     def get_accm(self):
         n_inner_step = self.config.arch.n_inner_step
         accm = AccmStageINR(
-            scalar_metric_names=("loss_total", "mse", "psnr","onsurface_loss","spatial_loss"),
+            scalar_metric_names=("loss_total", "mse", "psnr","onsurface_loss","spatial_loss","grad_loss","normal_loss","div_loss","bce_loss"),
             vector_metric_names=("inner_mse", "inner_psnr"),
             vector_metric_lengths=(n_inner_step, n_inner_step),
             device=self.device,
@@ -76,11 +76,17 @@ class Trainer(TrainerTemplate):
         model.eval()
         for it, xt in pbar:
             model.zero_grad()
-
             if self.config.dataset.type == "shapenet":
+
                 coord_inputs = xt['coords'].to(self.device)
-                xs = xt['occ'].to(self.device)
+                coord_inputs.requires_grad_()
                 labels=xt['label'].to(self.device)
+                if self.config.dataset.supervision == 'sdf':
+                    xs = xt['sdf'].to(self.device)
+                    normals = xt['normal'].to(self.device)
+                    xs = torch.concatenate([xs,normals],dim=-1)
+                else:
+                    xs = xt['occ'].to(self.device)
 
             else:
                 xs = xt.to(self.device)
@@ -98,7 +104,8 @@ class Trainer(TrainerTemplate):
             targets = xs.detach()
 
             #loss = model.module.compute_loss(outputs, targets, reduction="sum")
-            loss = model.compute_loss(outputs, targets, reduction="ce",label=labels)
+            #loss = model.compute_loss(outputs, targets, reduction="ce",label=labels)
+            loss = model.compute_loss(outputs, targets,reduction="ce",label=labels,type=self.config.dataset.supervision,coords=coord_inputs,mode='sum')
 
 
             metrics = dict(
@@ -108,7 +115,10 @@ class Trainer(TrainerTemplate):
 
                 onsurface_loss = loss["onsurface_loss"],
                 spatial_loss = loss["spatial_loss"],
-
+                grad_loss=loss["grad_loss"],
+                normal_loss=loss["normal_loss"],
+                div_loss=loss["div_loss"],
+                bce_loss=loss["bce_loss"]
                 #inner_mse=collated_history["mse"],
                 #inner_psnr=collated_history["psnr"],
             )
@@ -156,9 +166,19 @@ class Trainer(TrainerTemplate):
             #xs = xs.to(self.device, non_blocking=True)
 
             if self.config.dataset.type == "shapenet":
+
                 coord_inputs = xt['coords'].to(self.device)
-                xs = xt['occ'].to(self.device)
+                coord_inputs.requires_grad_()
                 labels=xt['label'].to(self.device)
+
+                if self.config.dataset.supervision == 'sdf':
+                    xs = xt['sdf'].to(self.device)
+                    normals = xt['normal'].to(self.device)
+                    xs = torch.concatenate([xs,normals],dim=-1)
+                else:
+                    xs = xt['occ'].to(self.device)
+
+
             else:
                 xs = xt.to(self.device)
                 coord_inputs = model.sample_coord_input(xs, device=xs.device)
@@ -171,10 +191,11 @@ class Trainer(TrainerTemplate):
             if  self.config.type == 'overfit':
                 outputs = model.overfit_one_shape(xs, coord=coord_inputs)
             else:
-                outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True)
+                outputs, _, collated_history = model(xs, coord=coord_inputs, is_training=True,label=labels,type=self.config.dataset.supervision)
 
             targets = xs.detach()
             #loss = model.module.compute_loss(outputs, targets)
+
 
             if self.config.arch.hyponet.fourier_mapping in ['deterministic_transinr']:
                 loss_type = 'mean'
@@ -183,7 +204,7 @@ class Trainer(TrainerTemplate):
                 loss_type = 'ce'
                 label = labels
 
-            loss = model.compute_loss(outputs, targets,reduction=loss_type,label=labels)
+            loss = model.compute_loss(outputs, targets,reduction=loss_type,label=labels,type=self.config.dataset.supervision,coords=coord_inputs)
 
             epoch_loss =float(loss["loss_total"].item())
 
@@ -205,11 +226,16 @@ class Trainer(TrainerTemplate):
                 loss_total=loss["loss_total"],
                 #mse=loss["mse"],
                 #psnr=loss["psnr"],
-                onsurface_loss=loss["onsurface_loss"],
-                spatial_loss=loss["spatial_loss"],
 
-                #inner_mse=collated_history["mse"] / xs.shape[0],
-                #inner_psnr=collated_history["psnr"] / xs.shape[0],
+                onsurface_loss = loss["onsurface_loss"],
+                spatial_loss = loss["spatial_loss"],
+                grad_loss=loss["grad_loss"],
+                normal_loss=loss["normal_loss"],
+
+                div_loss=loss["div_loss"],
+                bce_loss=loss["bce_loss"]
+                #inner_mse=collated_history["mse"],
+                #inner_psnr=collated_history["psnr"],
             )
             accm.update(metrics, count=1)
             total_step += 1
@@ -227,15 +253,23 @@ class Trainer(TrainerTemplate):
         return summary
 
     def logging(self, summary, scheduler=None, epoch=0, mode="train"):
-        if epoch % 100 == 1 or epoch % self.config.experiment.test_imlog_freq == 0:
+        if epoch>=50 and epoch % self.config.experiment.test_imlog_freq == 0:
             #self.reconloggingstruct(summary["xs"], upsample_ratio=1, epoch=epoch, mode=mode)
             if self.config.dataset.type == 'shapenet':
                 if self.config.type !='overfit':
                     model = self.model
                     model.eval()
-                    xs = summary["xs"]
-                    coords = xs['coords'].to(self.device)
-                    xs = xs['occ'].to(self.device)
+                    xt = summary["xs"]
+                    coords = xt['coords'].to(self.device)
+                    coords.requires_grad_()
+                    labels = xt['label'].to(self.device)
+
+                    if self.config.dataset.supervision == 'sdf':
+                        xs = xt['sdf'].to(self.device)
+                        normals = xt['normal'].to(self.device)
+                        xs = torch.concatenate([xs, normals], dim=-1)
+                    else:
+                        xs = xt['occ'].to(self.device)
 
                     vis = True
                     _, meshes, _ = model(xs, coords, is_training=False, vis=vis)
@@ -245,9 +279,10 @@ class Trainer(TrainerTemplate):
                     model.eval()
                     xs = summary["xs"]
                     coords = xs['coords'].to(self.device)
-                    xs = xs['occ'].to(self.device)
+                    #xs = xs['occ'].to(self.device)
+
                     vis = True
-                    meshes = model.overfit_one_shape(xs, coord=coords,vis=vis)
+                    meshes = model.overfit_one_shape(xs, coord=coords,vis=vis,type=self.config.dataset.supervision)
                     self.reconstruct_shape(meshes,epoch,mode=mode)
 
                 #self.writer.add_mesh(mode=mode, tag='my_mesh', vertices=vertices_tensor, colors=colors_tensor,
@@ -269,11 +304,17 @@ class Trainer(TrainerTemplate):
         self.writer.add_scalar("loss/loss_total", summary["loss_total"], mode, epoch)
         self.writer.add_scalar("loss/onsurface_loss", summary["onsurface_loss"], mode, epoch)
         self.writer.add_scalar("loss/spatial_loss", summary["spatial_loss"], mode, epoch)
+        self.writer.add_scalar("loss/grad_loss", summary["grad_loss"], mode, epoch)
+        self.writer.add_scalar("loss/normal_loss", summary["normal_loss"], mode, epoch)
+        self.writer.add_scalar("loss/div_loss", summary["div_loss"], mode, epoch)
+        self.writer.add_scalar("loss/bce_loss", summary["bce_loss"], mode, epoch)
+
         #self.writer.add_scalar("loss/mse", summary["mse"], mode, epoch)
         #self.writer.add_scalar("loss/psnr", summary["psnr"], mode, epoch)
 
         if mode == "train":
             self.writer.add_scalar("lr", scheduler.get_last_lr()[0], mode, epoch)
+            self.writer.add_scalar("inner_lr", self.model.get_lr(), mode, epoch)
 
         line = f"""ep:{epoch}, {mode:10s}, """
         line += summary.print_line()

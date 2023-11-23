@@ -8,6 +8,7 @@ from .modules.hyponet import HypoNet
 from .modules.latent_mapping import LatentMapping
 from .modules.weight_groups import WeightGroups
 from ..layers import AttentionStack
+from .modules import diff_operators
 
 
 class TransINR(nn.Module):
@@ -109,43 +110,109 @@ class TransINR(nn.Module):
     def encode_latent(self, xs_embed):
         return self.latent_mapping(xs_embed)
 
-    def compute_loss(self, preds, targets, reduction="ce",modulation_list=None,label=None):
+    def compute_loss(self, preds, targets, reduction="mean",modulation_list=None,label=None,type='occ',coords = None,mode='sum'):
+        if type == 'sdf':
+            #occ = targets[:,:,0][:,:,None]
+            gt_sdf = targets[:,:,0][:,:,None]
+            gt_normals = targets[:,:,1:]
+            gt_occ = (gt_sdf > 0).float()
+
+            pred_sign = preds[:,:,0][:,:,None]
+            pred_sdf = preds[:,:,1][:,:,None]
+
         assert reduction in ["mean", "sum", "ce","none"]
         batch_size = preds.shape[0]
-        sample_mses = torch.reshape((preds - targets) ** 2, (batch_size, -1)).mean(dim=-1)
 
         if reduction == "mean":
+            sample_mses = torch.reshape((preds - targets) ** 2, (batch_size, -1)).mean(dim=-1)
             total_loss = sample_mses.mean()
             psnr = (-10 * torch.log10(sample_mses)).mean()
         elif reduction == "sum":
+            sample_mses = torch.reshape((preds - targets) ** 2, (batch_size, -1)).mean(dim=-1)
             total_loss = sample_mses.sum()
             psnr = (-10 * torch.log10(sample_mses)).sum()
+
         elif reduction == "ce":
-            threshold = 1e-12
-            threshold_max = 1e2
-            #elementwise operation: sigmoid
-            #logits =1.0 / (1 + torch.exp(-preds))
-            #logits = torch.clamp(logits, min=threshold)
-            #if torch.count_nonzero(logits==0):
-            #    print("logits=0")
-            #binary cross entropy loss- element for each points
-            #total_loss = -targets * torch.log(logits)   -  (1-targets)* torch.log(1-logits)
-            #total_loss = torch.clamp(total_loss, min=threshold,max=threshold_max)
+            if type == 'occ':
+                total_loss_orig = torch.nn.BCEWithLogitsLoss(reduction='none')(preds, targets)
+                onsurface_loss = 0
+                spatial_loss = 0
 
-            total_loss_orig = torch.nn.BCEWithLogitsLoss(reduction='none')(preds, targets)
-            onsurface_loss = 0
-            spatial_loss = 0
+                total_loss = torch.reshape(total_loss_orig, (batch_size, -1)).mean(dim=-1)
+                total_loss= total_loss.sum()
+                psnr = -10 * torch.log10(total_loss)
 
-            total_loss = torch.reshape(total_loss_orig, (batch_size, -1)).mean(dim=-1)
-            total_loss= total_loss.sum()
-            psnr = -10 * torch.log10(total_loss)
+                if label is not None:
+                    onsurface_loss = label * total_loss_orig
+                    spatial_loss = (1-label) * total_loss_orig
+                    onsurface_loss = onsurface_loss.sum()
+                    spatial_loss = spatial_loss.sum()
+                    total_loss = onsurface_loss + 100 * spatial_loss
 
-            if label is not None:
-                onsurface_loss = label * total_loss_orig
-                spatial_loss = (1-label) * total_loss_orig
-                onsurface_loss = onsurface_loss.sum()
-                spatial_loss = spatial_loss.sum()
-                total_loss = onsurface_loss + 100 * spatial_loss
+            elif type =='sdf':
+                onsurface_loss = torch.Tensor([0]).squeeze()
+                spatial_loss = torch.Tensor([0]).squeeze()
+                div_loss = torch.Tensor([0]).squeeze()
+                normal_loss = torch.Tensor([0]).squeeze()
+                grad_loss = torch.Tensor([0]).squeeze()
+                bce_loss = torch.Tensor([0]).squeeze()
+                # TODO: truncate predicted sdf between -0.1 and 0.1
+
+                bce_loss = torch.nn.BCEWithLogitsLoss(reduction='none')(pred_sign, gt_occ)
+                bce_loss = torch.reshape(bce_loss, (batch_size, -1)).mean(dim=-1)
+
+
+                #preds = torch.clamp(preds, -0.1, 0.1)
+                sdf_loss = torch.nn.functional.l1_loss(pred_sdf,gt_sdf,reduction='none')
+                gradient = diff_operators.gradient(pred_sdf, coords)
+
+                grad_constraint = torch.abs(gradient.norm(dim=-1) - 1)
+                normal_constraint = 1 - torch.nn.functional.cosine_similarity(gradient, gt_normals, dim=-1)
+
+                #div_constraint = diff_operators.gradient(preds,coords).norm(dim=-1)
+                #div_loss = 1*div_constraint.reshape((batch_size, -1)).mean(dim=-1).sum()
+
+
+                sdf_loss = torch.reshape(sdf_loss, (batch_size, -1)).mean(dim=-1)
+                normal_loss = 1 * normal_constraint.reshape((batch_size, -1)).mean(dim=-1)
+                grad_loss = 1 * grad_constraint.reshape((batch_size, -1)).mean(dim=-1)
+
+
+                if mode == 'sum':
+                    sdf_loss = sdf_loss.sum()
+                    normal_loss=normal_loss.sum()
+                    grad_loss = grad_loss.sum()
+                    bce_loss = bce_loss.sum()
+
+                if mode == 'mean':
+                    sdf_loss = sdf_loss.mean()
+                    normal_loss = normal_loss.mean()
+                    grad_loss = grad_loss.mean()
+                    bce_loss = bce_loss.mean()
+
+                #normal_loss =1 * grad_constraint.reshape((batch_size, -1)).mean(dim=-1).sum()
+                #grad_loss = 1 * normal_constraint.reshape((batch_size, -1)).mean(dim=-1).sum()
+
+
+                if label is not None:
+                    #onsurface_loss = label * sdf_loss
+                    #spatial_loss = (1-label) * sdf_loss
+
+                    #onsurface_loss = onsurface_loss.reshape(batch_size, -1).mean(dim=-1)
+                    #onsurface_loss = onsurface_loss.sum()
+                    #spatial_loss = spatial_loss.reshape(batch_size, -1).mean(dim=-1)
+                    #spatial_loss = spatial_loss.sum()
+
+                    #total_loss = onsurface_loss + spatial_loss
+
+                    pass
+
+                total_loss = sdf_loss + (5e-3) * normal_loss + (2e-3) * bce_loss + (3e-3) * grad_loss
+                #total_loss = sdf_loss+ (2e-3) * bce_loss
+
+                if total_loss<0:
+                    print('a')
+                psnr = -10 * torch.log10(total_loss)
 
             #regularization:
             if modulation_list is not None:
@@ -156,14 +223,12 @@ class TransINR(nn.Module):
 
             pass
         else:
+            sample_mses = torch.reshape((preds - targets) ** 2, (batch_size, -1)).mean(dim=-1)
             total_loss = sample_mses
             psnr = -10 * torch.log10(sample_mses)
 
-        if torch.isnan(total_loss):
-            print('a')
-            pass
 
-        return {"loss_total": total_loss, "mse": total_loss, "psnr": psnr,"onsurface_loss":onsurface_loss,"spatial_loss":spatial_loss}
+        return {"loss_total": total_loss, "mse": total_loss, "psnr": psnr,"onsurface_loss":onsurface_loss,"spatial_loss":spatial_loss,"normal_loss":normal_loss,"grad_loss":grad_loss,"div_loss":div_loss,"bce_loss":bce_loss}
 
     def sample_coord_input(self, xs, coord_range=None, upsample_ratio=1.0, device=None):
         device = device if device is not None else xs.device
